@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>P端 BI 需求管理工作台 - 实时协作</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --bg: #fafbfc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #0ea5e9;
+      --accent-hover: #0284c7;
+      --danger: #dc2626;
+      --success: #16a34a;
+    }
+    body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+
+    .online-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .online-indicator.connected { color: var(--success); }
+    .online-indicator.disconnected { color: var(--danger); }
+    .online-indicator .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    .online-indicator.connected .dot { background: var(--success); }
+    .online-indicator.disconnected .dot { background: var(--danger); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .header h1 { margin: 0 0 10px; font-size: 24px; }
+    .header-actions { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+    .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 14px; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: white; border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #f8fafc; }
+    .btn-danger { background: var(--danger); color: white; }
+
+    .table-container { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg); font-weight: 600; font-size: 13px; }
+    tr:hover { background: #f8fafc; }
+
+    .tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+    .tag-p0 { background: #FEE2E2; color: #991B1B; }
+    .tag-p1 { background: #FFEDD5; color: #9A3412; }
+    .tag-p2, .tag-p3 { background: #f1f5f9; color: var(--text-muted); }
+    .tag-进行中 { background: #DBEAFE; color: #1e40af; }
+    .tag-已结束 { background: #D1FAE5; color: #065f46; }
+    .tag-待排期 { background: #f8fafc; color: var(--text-muted); }
+
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal.open { display: flex; }
+    .modal-content { background: white; border-radius: 12px; padding: 30px; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; }
+    .modal-content h2 { margin: 0 0 20px; }
+    .form-row { margin-bottom: 15px; }
+    .form-row label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; }
+    .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; }
+    .form-row textarea { resize: vertical; }
+
+    .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--text); color: white; padding: 12px 24px; border-radius: 8px; z-index: 2000; display: none; }
+    .toast.show { display: block; animation: slideUp 0.3s; }
+    .toast.error { background: var(--danger); }
+    @keyframes slideUp { from { transform: translateX(-50%) translateY(20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+
+    .search-bar { margin-bottom: 15px; }
+    .search-bar input { width: 100%; max-width: 400px; padding: 10px 15px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+
+    .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+    .filter-bar select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="online-indicator disconnected" id="onlineIndicator">
+    <span class="dot"></span>
+    <span id="statusText">连接中...</span>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <h1>P端 BI 需求管理工作台 - 实时协作</h1>
+      <p style="color: var(--text-muted); margin: 5px 0;">共 <span id="totalCount">0</span> 条需求 | <span id="syncStatus">实时同步中...</span></p>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openAddModal()">新增需求</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">导出 CSV</button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="搜索需求名称、负责人..." oninput="applyFilters()">
+      </div>
+      <div class="filter-bar">
+        <select id="filterWeek" onchange="applyFilters()">
+          <option value="">全部排期周</option>
+        </select>
+        <select id="filterStatus" onchange="applyFilters()">
+          <option value="">全部状态</option>
+          <option value="待排期">待排期</option>
+          <option value="进行中">进行中</option>
+          <option value="已结束">已结束</option>
+        </select>
+        <select id="filterPriority" onchange="applyFilters()">
+          <option value="">全部优先级</option>
+          <option value="P0">P0</option>
+          <option value="P1">P1</option>
+          <option value="P2">P2</option>
+          <option value="P3">P3</option>
+        </select>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>排期周</th>
+            <th>需求名称</th>
+            <th>优先级</th>
+            <th>状态</th>
+            <th>负责人</th>
+            <th>交付类型</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="7" style="text-align: center; padding: 40px;">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 新增/编辑弹窗 -->
+  <div class="modal" id="editModal" onclick="if(event.target===this) closeModal()">
+    <div class="modal-content">
+      <h2 id="modalTitle">新增需求</h2>
+      <form id="editForm" onsubmit="saveData(); return false;">
+        <input type="hidden" id="editIndex" value="-1">
+        <div class="form-row">
+          <label>排期周 *</label>
+          <input type="text" id="排期周" required placeholder="如 26w11">
+        </div>
+        <div class="form-row">
+          <label>需求名称 *</label>
+          <input type="text" id="需求名称" required>
+        </div>
+        <div class="form-row">
+          <label>需求优先级 *</label>
+          <select id="需求优先级" required>
+            <option value="">请选择</option>
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>当前状态 *</label>
+          <select id="当前状态" required>
+            <option value="">请选择</option>
+            <option value="待排期">待排期</option>
+            <option value="进行中">进行中</option>
+            <option value="已结束">已结束</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>BI（负责人）*</label>
+          <input type="text" id="BI" required>
+        </div>
+        <div class="form-row">
+          <label>交付类型 *</label>
+          <input type="text" id="交付类型" required placeholder="如：数据建设、一次性">
+        </div>
+        <div class="form-row">
+          <label>产线</label>
+          <input type="text" id="产线" placeholder="如：项目4-整体">
+        </div>
+        <div class="form-row">
+          <label>需求内容</label>
+          <textarea id="需求内容" rows="3"></textarea>
+        </div>
+        <div class="form-row">
+          <label>备注</label>
+          <textarea id="备注" rows="2"></textarea>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">取消</button>
+          <button type="submit" class="btn btn-primary" style="flex: 1;">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const FIELDS = ['排期周', '产线', 'BI', '要解决的问题', '需求名称', '需求内容', '交付类型', '需求优先级', '当前状态', '需求团队', '需求人', '工时（h）', '分类', '细项分类', '备注'];
+    let rawData = [];
+    let filteredData = [];
+    let ws = null;
+    let reconnectTimer = null;
+
+    // WebSocket 连接
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log('WebSocket 连接成功');
+        updateStatus(true, '实时同步中');
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+
+          if (msg.type === 'init' || msg.type === 'data_update') {
+            rawData = msg.data || [];
+            updateWeekFilter();
+            applyFilters();
+          }
+        } catch (e) {
+          console.error('消息解析错误:', e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket 错误:', error);
+        updateStatus(false, '连接错误');
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket 连接关闭');
+        updateStatus(false, '连接断开');
+
+        // 5秒后重连
+        reconnectTimer = setTimeout(() => {
+          console.log('尝试重新连接...');
+          connectWebSocket();
+        }, 5000);
+      };
+    }
+
+    // 发送数据更新
+    function sendUpdate(data) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'update',
+          data: data
+        }));
+      } else {
+        showToast('连接已断开，请刷新页面', true);
+      }
+    }
+
+    // 更新状态指示器
+    function updateStatus(connected, text) {
+      const indicator = document.getElementById('onlineIndicator');
+      const statusText = document.getElementById('statusText');
+      indicator.className = 'online-indicator ' + (connected ? 'connected' : 'disconnected');
+      statusText.textContent = text || (connected ? '已连接' : '未连接');
+      document.getElementById('syncStatus').textContent = text;
+    }
+
+    // 更新排期周筛选
+    function updateWeekFilter() {
+      const weeks = [...new Set(rawData.map(r => r['排期周']).filter(Boolean))].sort().reverse();
+      const select = document.getElementById('filterWeek');
+      const current = select.value;
+      select.innerHTML = '<option value="">全部排期周</option>' +
+        weeks.map(w => `<option value="${w}">${w}</option>`).join('');
+      select.value = current;
+    }
+
+    // 应用筛选
+    function applyFilters() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const week = document.getElementById('filterWeek').value;
+      const status = document.getElementById('filterStatus').value;
+      const priority = document.getElementById('filterPriority').value;
+
+      filteredData = rawData.filter(row => {
+        if (week && row['排期周'] !== week) return false;
+        if (status && row['当前状态'] !== status) return false;
+        if (priority && row['需求优先级'] !== priority) return false;
+        if (search) {
+          const searchStr = (row['需求名称'] + row['BI'] + row['需求内容']).toLowerCase();
+          if (!searchStr.includes(search)) return false;
+        }
+        return true;
+      });
+
+      render();
+    }
+
+    // 渲染表格
+    function render() {
+      const tbody = document.getElementById('tableBody');
+      document.getElementById('totalCount').textContent = rawData.length;
+
+      if (filteredData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">暂无数据</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filteredData.map((row, index) => {
+        const realIndex = rawData.indexOf(row);
+        return `
+        <tr>
+          <td><strong>${row['排期周'] || '-'}</strong></td>
+          <td style="max-width: 300px;">${row['需求名称'] || '-'}</td>
+          <td><span class="tag tag-${(row['需求优先级'] || '').toLowerCase()}">${row['需求优先级'] || '-'}</span></td>
+          <td><span class="tag tag-${row['当前状态'] || ''}">${row['当前状态'] || '-'}</span></td>
+          <td>${row['BI'] || '-'}</td>
+          <td>${row['交付类型'] || '-'}</td>
+          <td style="white-space: nowrap;">
+            <button class="btn btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="editRow(${realIndex})">编辑</button>
+            <button class="btn btn-danger" style="padding: 5px 12px; font-size: 12px;" onclick="deleteRow(${realIndex})">删除</button>
+          </td>
+        </tr>
+      `}).join('');
+    }
+
+    // 打开新增弹窗
+    function openAddModal() {
+      document.getElementById('modalTitle').textContent = '新增需求';
+      document.getElementById('editIndex').value = '-1';
+      document.getElementById('editForm').reset();
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    // 编辑行
+    function editRow(index) {
+      const row = rawData[index];
+      document.getElementById('modalTitle').textContent = '编辑需求';
+      document.getElementById('editIndex').value = index;
+      FIELDS.forEach(field => {
+        const el = document.getElementById(field);
+        if (el) el.value = row[field] || '';
+      });
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    // 删除行
+    function deleteRow(index) {
+      if (!confirm('确定删除这条需求吗？')) return;
+
+      const newData = [...rawData];
+      newData.splice(index, 1);
+      sendUpdate(newData);
+      showToast('删除成功');
+    }
+
+    // 保存数据
+    function saveData() {
+      const index = parseInt(document.getElementById('editIndex').value);
+      const row = {};
+      FIELDS.forEach(field => {
+        const el = document.getElementById(field);
+        row[field] = el ? (el.value || '').trim() : '';
+      });
+
+      const newData = [...rawData];
+      if (index === -1) {
+        newData.push(row);
+        showToast('新增成功');
+      } else {
+        newData[index] = row;
+        showToast('保存成功');
+      }
+
+      sendUpdate(newData);
+      closeModal();
+    }
+
+    // 关闭弹窗
+    function closeModal() {
+      document.getElementById('editModal').classList.remove('open');
+    }
+
+    // 导出 CSV
+    function exportCSV() {
+      if (rawData.length === 0) {
+        showToast('暂无数据可导出', true);
+        return;
+      }
+      const csv = [FIELDS.join(',')].concat(
+        rawData.map(row => FIELDS.map(f => `"${(row[f] || '').replace(/"/g, '""')}"`).join(','))
+      ).join('\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `bi-demand-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      showToast('导出成功');
+    }
+
+    // 提示消息
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.toggle('error', isError);
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // 初始化
+    connectWebSocket();
+  </script>
+</body>
+</html>

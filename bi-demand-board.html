@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>P端 BI 需求管理工作台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --bg: #fafbfc;
+      --surface: #ffffff;
+      --surface-hover: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #0ea5e9;
+      --accent-hover: #0284c7;
+      --danger: #dc2626;
+      --success: #16a34a;
+    }
+    body { margin: 0; font-family: "DM Sans", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .app { min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+    /* Landing — white + gradient, outline title */
+    .landing { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; background: linear-gradient(160deg, rgba(220,252,231,0.5) 0%, rgba(255,255,255,0.9) 30%, rgba(224,242,254,0.5) 100%); }
+    .landing.hidden { display: none; }
+    .landing-nav { position: absolute; top: 0; left: 0; right: 0; padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); }
+    .landing-title { font-family: "STKaiti", "华文楷体", "KaiTi", "楷体", serif; font-size: clamp(3rem, 12vw, 6rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1; margin: 0 0 48px; color: #000; }
+    .landing-enter { padding: 16px 40px; border-radius: 999px; font-size: 1rem; font-weight: 600; cursor: pointer; border: 2px solid var(--text); background: transparent; color: var(--text); font-family: inherit; letter-spacing: 0.04em; transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease; }
+    .landing-enter:hover { background: var(--text); color: var(--surface); transform: scale(1.02); }
+    .landing-info { margin-top: 56px; max-width: 360px; text-align: left; font-size: 0.8125rem; color: var(--text-muted); line-height: 1.6; }
+    .landing-warning { margin-top: 24px; font-size: 0.8125rem; color: var(--danger); display: none; }
+    .landing-warning.show { display: block; }
+    .landing-warning::before { content: ""; display: block; width: 24px; height: 1px; background: var(--border); margin-bottom: 8px; }
+
+    /* Board panel — three-column layout */
+    .board-panel { display: none; flex: 1; min-height: 100vh; background: #f5f6f8; }
+    .board-panel.visible { display: flex; flex-direction: column; }
+    .board-header { flex-shrink: 0; padding: 20px 20px 16px; display: flex; align-items: center; justify-content: space-between; background: #f5f6f8; }
+    .board-header-title { font-size: 16pt; font-weight: 700; color: var(--text); }
+    .board-layout { display: flex; flex: 1; gap: 16px; padding: 0 20px 20px; min-height: 0; }
+    .board-left { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+    .board-center { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; overflow: auto; }
+
+    /* Floating / soft cards — no border, shadow only */
+    .soft-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 20px; transition: box-shadow 0.2s ease; }
+    .soft-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .soft-card-title { font-size: 14pt; font-weight: 700; color: var(--text); margin: 0 0 4px; }
+    .soft-card-sub { font-size: 12pt; color: var(--text-muted); margin: 0; }
+    .soft-card-body { font-size: 13pt; color: var(--text); margin-top: 12px; }
+
+    /* Left nav — 负责人 list */
+    .nav-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 16px; }
+    .nav-card-title { font-size: 13pt; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 12px; padding: 0 4px; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s ease; margin-bottom: 4px; }
+    .nav-item:hover { background: #f8fafc; }
+    .nav-item.active { background: rgba(14,165,233,0.1); }
+    .nav-item-icon { width: 36px; height: 36px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--text-muted); flex-shrink: 0; }
+    .nav-item-info { flex: 1; min-width: 0; }
+    .nav-item-name { font-size: 13pt; font-weight: 500; color: var(--text); }
+    .nav-item-count { font-size: 12pt; color: var(--text-muted); margin-top: 2px; }
+    .nav-item-badge { font-size: 12pt; font-weight: 600; color: var(--accent); }
+
+    /* Center — summary cards row */
+    .summary-cards { display: flex; gap: 12px; }
+    .summary-cards .soft-card { flex: 1; padding: 24px; }
+    .summary-cards .soft-card-sub { font-size: 12pt; }
+    .summary-cards .stat-num { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); margin-top: 8px; }
+    .summary-cards .stat-bar { height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 12px; overflow: hidden; }
+    .summary-cards .stat-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.3s ease; }
+
+    /* Center — section titles */
+    .section-title { font-size: 16pt; font-weight: 700; color: var(--text); margin: 0 0 12px; }
+    .section-sub { font-size: 12pt; color: var(--text-muted); margin: 0 0 16px; }
+
+    /* Left — calendar card (above nav) */
+    .calendar-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 20px; }
+    .calendar-card .soft-card-title { font-size: 14pt; margin-bottom: 16px; }
+    .calendar-today { font-size: 13pt; color: var(--text); margin-bottom: 8px; }
+    .calendar-week { font-size: 13pt; color: var(--text); font-weight: 600; }
+
+    /* Left — 近三周产线（项目）列表 */
+    .line-list-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s ease; margin-bottom: 4px; font-size: 12pt; }
+    .line-list-item:hover { background: #f8fafc; }
+    .line-list-item.active { background: rgba(14,165,233,0.12); }
+    .line-list-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.06); }
+    .line-list-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
+    .line-list-badge { font-size: 12pt; font-weight: 600; color: var(--accent); flex-shrink: 0; }
+
+    /* Table as soft row cards */
+    .detail-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 0; overflow: hidden; }
+    .detail-card .search-bar { padding: 16px 20px; border: none; background: transparent; box-shadow: none; margin: 0; }
+    .detail-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; padding: 0 12px 12px; }
+    .detail-table thead th { font-size: 12pt; font-weight: 600; color: var(--text-muted); text-align: left; padding: 12px 16px; }
+    .detail-table tbody tr { background: #fff; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.05); transition: box-shadow 0.2s ease; }
+    .detail-table tbody tr:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); cursor: pointer; }
+    .detail-table tbody td { padding: 14px 16px; font-size: 13pt; border: none; border-radius: 0; }
+    .detail-table tbody td:first-child { border-radius: 10px 0 0 10px; }
+    .detail-table tbody td:last-child { border-radius: 0 10px 10px 0; }
+
+    /* Header (compact in new layout) */
+    .header { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 1px 0 rgba(0,0,0,0.05); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .header-left { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+    .header-title { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+    .header-sub { font-size: 0.8125rem; color: var(--text-muted); }
+    .header-sub#currentWeekHint { color: var(--accent); font-weight: 600; }
+    .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn { padding: 10px 18px; border-radius: 999px; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; font-family: inherit; transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface-hover); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 14px rgba(14,165,233,0.35); }
+
+    /* Stats */
+    .stats { display: flex; gap: 20px; padding: 20px 28px; margin: 0 28px; margin-top: 20px; }
+    .stat-card { flex: 1; padding: 20px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; transition: transform 0.25s ease, box-shadow 0.25s ease; animation: fadeUp 0.5s ease backwards; }
+    .stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .stat-card:nth-child(2) { animation-delay: 0.1s; }
+    .stat-card:nth-child(3) { animation-delay: 0.15s; }
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.08); }
+    .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 6px; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); letter-spacing: -0.02em; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Trend chart card */
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 0 28px; margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .chart-card-header { margin-bottom: 16px; }
+    .chart-card-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0 0 4px; }
+    .chart-card-sub { font-size: 0.8125rem; color: var(--text-muted); margin: 0; }
+    .chart-wrap { position: relative; height: 220px; }
+    .chart-wrap canvas { max-height: 220px; }
+    .trend-chart-tooltip { position: absolute; padding: 10px 14px; background: #fff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); font-size: 13px; line-height: 1.6; pointer-events: none; z-index: 50; border: 1px solid var(--border); white-space: nowrap; }
+
+    /* Filter bar */
+    .filter-bar { background: var(--surface); border: 1px solid var(--border); padding: 14px 28px; margin: 0 28px; margin-top: 16px; border-radius: 12px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; transition: border-color 0.2s ease; }
+    .filter-bar:focus-within { border-color: var(--accent); }
+    .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 320px; }
+    .search-wrap::before { content: "🔍"; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; opacity: 0.5; }
+    .search-input { width: 100%; padding: 10px 14px 10px 38px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; font-size: 0.875rem; color: var(--text); transition: border-color 0.2s ease; }
+    .search-input::placeholder { color: var(--text-muted); }
+    .search-input:focus { outline: none; border-color: var(--accent); }
+    .filter-select { padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; font-size: 0.875rem; min-width: 120px; color: var(--text); cursor: pointer; transition: border-color 0.2s ease; }
+    .filter-select:focus { outline: none; border-color: var(--accent); }
+    .view-tabs { display: flex; background: var(--bg); border-radius: 999px; padding: 4px; border: 1px solid var(--border); margin-left: auto; }
+    .view-tab { padding: 8px 18px; border-radius: 999px; font-size: 0.875rem; cursor: pointer; border: none; background: transparent; color: var(--text-muted); font-family: inherit; font-weight: 500; transition: color 0.2s ease, background 0.2s ease; }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active { background: var(--accent); color: #fff; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { padding: 8px 16px; border-radius: 999px; font-size: 0.8125rem; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-family: inherit; font-weight: 500; transition: all 0.2s ease; }
+    .chip:hover { color: var(--text); border-color: var(--accent); }
+    .chip.active { background: rgba(14,165,233,0.1); border-color: var(--accent); color: var(--accent); }
+
+    /* Main & Table */
+    .main { flex: 1; padding: 20px 28px 32px; overflow: auto; }
+    .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .table { width: 100%; border-collapse: collapse; }
+    .table th { background: var(--bg); padding: 14px 20px; text-align: left; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .table th.sortable { cursor: pointer; user-select: none; transition: color 0.2s ease; }
+    .table th.sortable:hover { color: var(--accent); }
+    .table td { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 0.875rem; vertical-align: middle; transition: background 0.2s ease; }
+    .table tbody tr { animation: fadeUp 0.4s ease backwards; }
+    .table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+    .table tbody tr:nth-child(2) { animation-delay: 0.04s; }
+    .table tbody tr:nth-child(3) { animation-delay: 0.06s; }
+    .table tbody tr:nth-child(4) { animation-delay: 0.08s; }
+    .table tbody tr:nth-child(5) { animation-delay: 0.1s; }
+    .table tbody tr:nth-child(n+6) { animation-delay: 0.12s; }
+    .table tbody tr:hover { background: var(--surface-hover); cursor: pointer; }
+    .table tbody tr:last-child td { border-bottom: none; }
+    .cell-name { max-width: 280px; }
+    .cell-name .name { font-weight: 500; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+    .cell-name .preview { font-size: 0.75rem; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+    .tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+    .tag-p0 { background: #FEE2E2; color: #991B1B; border: 1px solid #fecaca; }
+    .tag-p1 { background: #FFEDD5; color: #9A3412; border: 1px solid #fed7aa; }
+    .tag-p2, .tag-p3 { background: #f1f5f9; color: var(--text-muted); border: 1px solid var(--border); }
+    .tag-进行中 { background: #DBEAFE; color: #1e40af; border: 1px solid #93c5fd; }
+    .tag-已结束, .tag-已完成 { background: #D1FAE5; color: #065f46; border: 1px solid #86efac; }
+    .tag-待排期, .tag-待开始 { background: #f8fafc; color: var(--text-muted); border: 1px solid var(--border); }
+    .tag-Delay { background: #FEF3C7; color: #92400e; border: 1px solid #fcd34d; }
+    .tag-line { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 500; color: var(--text); border: none; }
+    .avatar { width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; display: inline-flex; align-items: center; justify-content: center; font-size: 0.6875rem; color: var(--text-muted); flex-shrink: 0; vertical-align: middle; border: 1px solid var(--border); }
+    .avatar-wrap { display: inline-flex; align-items: center; gap: 2px; margin-right: 8px; vertical-align: middle; }
+    .empty-state { text-align: center; padding: 64px 24px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 52px; margin-bottom: 16px; opacity: 0.6; }
+    .empty-state .btn { margin-top: 20px; }
+
+    /* Board view */
+    .board { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; align-items: flex-start; }
+    .board-column { min-width: 300px; max-width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .board-column h3 { margin: 0 0 8px; font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .board-column .meta { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 14px; }
+    .board-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .board-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.06); }
+    .board-card .card-row { font-size: 0.8125rem; margin-bottom: 6px; color: var(--text); }
+    .board-card .card-detail { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
+    .board-card.expanded .card-detail { max-height: 400px; }
+
+    /* Drawer */
+    .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
+    .drawer-mask.open { opacity: 1; visibility: visible; }
+    .drawer { position: fixed; top: 0; right: 0; width: min(400px, 90vw); height: 100%; background: var(--surface); border-left: 1px solid var(--border); z-index: 1001; box-shadow: -8px 0 40px rgba(0,0,0,0.5); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); overflow-y: auto; }
+    .drawer.open { transform: translateX(0); }
+    .drawer-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+    .drawer-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); padding: 4px; transition: color 0.2s ease; line-height: 1; }
+    .drawer-close:hover { color: var(--text); }
+    .drawer-body { padding: 24px; }
+    .drawer-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .drawer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; font-size: 0.8125rem; margin-bottom: 20px; color: var(--text-muted); }
+    .drawer-section { margin-bottom: 20px; }
+    .drawer-section h4 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0 0 8px; }
+    .drawer-section .content { font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+    .drawer-section.remark { background: var(--bg); padding: 14px; border-radius: 8px; border: 1px solid var(--border); }
+    .drawer-section .content a { color: var(--accent); text-decoration: none; }
+    .drawer-section .content a:hover { text-decoration: underline; }
+    .drawer-status-edit .drawer-status-row { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+    .drawer-status-edit .drawer-status-row select { flex: 1; max-width: 140px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); }
+    .drawer-verified { font-size: 0.75rem; color: var(--text-muted); margin: 0 0 10px; }
+    .drawer-verified a { color: var(--accent); text-decoration: none; }
+    .drawer-verified a:hover { text-decoration: underline; }
+    .drawer-edit-form { margin-top: 4px; }
+    .drawer-edit-form .form-row { margin-bottom: 12px; }
+    .drawer-edit-form label { display: block; font-size: 0.75rem; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; }
+    .drawer-edit-form input, .drawer-edit-form select, .drawer-edit-form textarea {
+      width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.875rem; color: var(--text); font-family: inherit; box-sizing: border-box;
+    }
+    .drawer-edit-form textarea { min-height: 72px; resize: vertical; }
+    .drawer-edit-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: #b91c1c; box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35); }
+    .drawer-verify-banner { background: var(--bg); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px; font-size: 0.8125rem; color: var(--text-muted); }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--text); color: var(--bg); padding: 14px 24px; border-radius: 999px; font-size: 0.875rem; font-weight: 500; z-index: 2000; opacity: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.4); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.error { background: var(--danger); color: #fff; }
+
+    /* Modals — dark theme */
+    .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1100; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; }
+    .modal-mask.open { opacity: 1; visibility: visible; }
+    .modal-box { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.96); width: min(560px, 92vw); max-height: 88vh; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 24px 48px rgba(0,0,0,0.12); z-index: 1101; opacity: 0; visibility: hidden; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease, visibility 0.3s ease; overflow: hidden; display: flex; flex-direction: column; }
+    .modal-mask.open + .modal-box { transform: translate(-50%, -50%) scale(1); opacity: 1; visibility: visible; }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border); font-size: 1.125rem; font-weight: 700; color: var(--text); flex-shrink: 0; }
+    .modal-body { padding: 24px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px; flex-shrink: 0; }
+    .form-row { margin-bottom: 16px; }
+    .form-row label { display: block; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
+    .form-row label .required { color: var(--danger); }
+    .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; color: var(--text); font-family: inherit; transition: border-color 0.2s ease; }
+    .form-row input::placeholder, .form-row textarea::placeholder { color: var(--text-muted); }
+    .form-row input:focus, .form-row select:focus, .form-row textarea:focus { outline: none; border-color: var(--accent); }
+    .form-row textarea { min-height: 80px; resize: vertical; }
+    .form-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+    .form-grid2 .form-row { margin-bottom: 16px; }
+
+    #fileInput { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="landing" id="landingView">
+      <div class="landing-nav">
+        <span>P端 BI 需求看板</span>
+      </div>
+      <h1 class="landing-title">P端BI需求看板</h1>
+      <button type="button" class="landing-enter" id="btnEnterBoard">进入看板</button>
+      <div class="landing-info">
+        <div class="landing-warning" id="landingWarning">BI资源紧张，请谨慎提需</div>
+      </div>
+    </div>
+    <div class="board-panel" id="boardPanel">
+    <header class="header">
+      <div class="header-left">
+        <span class="header-title">P端 BI 需求看板</span>
+        <span class="header-sub" id="dataScopeHint">请上传 CSV 导入数据</span>
+        <span class="header-sub" id="currentWeekHint" style="margin-left:8px;"></span>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="btn btn-secondary" id="btnBackLanding">返回首页</button>
+        <button type="button" class="btn btn-primary" id="btnAddDemand">新增需求</button>
+        <button type="button" class="btn btn-secondary" id="btnBatchAdd">批量新增需求</button>
+        <button type="button" class="btn btn-secondary" id="btnExport">导出报表</button>
+      </div>
+    </header>
+
+    <div class="board-layout">
+      <aside class="board-left">
+        <div class="calendar-card">
+          <h3 class="soft-card-title">当前周</h3>
+          <div class="calendar-today" id="calendarToday">—</div>
+          <div class="calendar-week" id="calendarWeek">—</div>
+        </div>
+        <div class="nav-card" id="leftLineListCard" style="display:none">
+          <div class="nav-card-title">近三周 · 项目（产线）</div>
+          <div id="leftLineList"></div>
+        </div>
+        <div class="nav-card">
+          <div class="nav-card-title">近三周 · 负责人</div>
+          <div id="leftNavList"></div>
+        </div>
+      </aside>
+      <main class="board-center">
+        <div class="summary-cards">
+          <div class="soft-card">
+            <div class="soft-card-sub">总需求数量</div>
+            <div class="stat-num" id="statTotal">0</div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statTotalBar" style="width:100%"></div></div>
+          </div>
+          <div class="soft-card">
+            <div class="soft-card-sub">P0 高优占比</div>
+            <div class="stat-num" id="statP0">0%</div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statP0Bar" style="width:0%"></div></div>
+          </div>
+          <div class="soft-card">
+            <div class="soft-card-sub">交付完成率</div>
+            <div class="stat-num" id="statDone">0%</div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="statDoneBar" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="soft-card" id="trendChartCard">
+          <h3 class="soft-card-title">每周需求趋势</h3>
+          <p class="soft-card-sub">按排期周汇总需求数量</p>
+          <div class="chart-wrap" style="margin-top:16px">
+            <canvas id="trendChartCanvas" width="800" height="220"></canvas>
+            <div id="trendChartTooltip" class="trend-chart-tooltip" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="soft-card detail-card">
+          <h3 class="soft-card-title" style="margin-bottom:12px">需求明细</h3>
+          <div class="filter-bar search-bar" style="margin-bottom:8px; padding:12px 0">
+            <div class="search-wrap" style="flex:1; max-width:320px">
+              <input type="text" class="search-input" id="searchInput" placeholder="搜索需求名称、背景或负责人..." />
+            </div>
+            <select class="filter-select" id="filterWeek" style="min-width:100px"><option value="">全部排期周</option></select>
+            <select class="filter-select" id="filterLine" style="min-width:100px"><option value="">全部产线</option></select>
+            <select class="filter-select" id="filterStatus" style="min-width:90px"><option value="">全部状态</option></select>
+            <button type="button" class="chip" id="chipP01">P0/P1</button>
+            <button type="button" class="chip" id="chipMine">我的需求</button>
+            <div class="view-tabs" style="margin-left:auto">
+              <button type="button" class="view-tab active" data-view="list">列表</button>
+              <button type="button" class="view-tab" data-view="board">按人</button>
+            </div>
+          </div>
+          <div id="listView">
+            <table class="table detail-table">
+              <thead>
+                <tr>
+                  <th class="sortable" data-sort="排期周">排期周</th>
+                  <th>产线</th>
+                  <th>需求名称（摘要）</th>
+                  <th class="sortable" data-sort="需求优先级">优先级</th>
+                  <th>状态</th>
+                  <th>负责人</th>
+                  <th>交付类型</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+            <div class="empty-state" id="emptyList" style="display: none; padding: 40px 20px;">
+              <div class="icon">📋</div>
+              <p>当前筛选项下没有需求记录哦</p>
+              <button type="button" class="btn btn-primary" id="btnClearFilter">清除筛选</button>
+            </div>
+          </div>
+        </div>
+        <div id="boardView" style="display: none;">
+          <div class="board" id="boardColumns"></div>
+          <div class="empty-state" id="emptyBoard" style="display: none;">
+            <div class="icon">👥</div>
+            <p>当前筛选项下没有需求记录哦</p>
+            <button type="button" class="btn btn-primary" id="btnClearFilterBoard">清除筛选</button>
+          </div>
+        </div>
+      </main>
+    </div>
+    </div>
+  </div>
+
+  <div class="drawer-mask" id="drawerMask"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title" id="drawerTitle"></div>
+        <div id="drawerSub"></div>
+      </div>
+      <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭">×</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modal-mask" id="addDemandModalMask"></div>
+  <div class="modal-box" id="addDemandModal">
+    <div class="modal-header">新增需求</div>
+    <div class="modal-body">
+      <div class="form-grid2">
+        <div class="form-row">
+          <label>排期周 <span class="required">*</span></label>
+          <input type="text" id="fd排期周" placeholder="如 26w11" />
+        </div>
+        <div class="form-row">
+          <label>需求优先级 <span class="required">*</span></label>
+          <select id="fd需求优先级">
+            <option value="">请选择</option>
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>需求名称 <span class="required">*</span></label>
+          <input type="text" id="fd需求名称" placeholder="必填" />
+        </div>
+        <div class="form-row">
+          <label>当前状态 <span class="required">*</span></label>
+          <select id="fd当前状态">
+            <option value="">请选择</option>
+            <option value="待排期">待排期</option>
+            <option value="进行中">进行中</option>
+            <option value="已结束">已结束</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>BI（负责人） <span class="required">*</span></label>
+          <input type="text" id="fdBI" placeholder="必填" />
+        </div>
+        <div class="form-row">
+          <label>交付类型 <span class="required">*</span></label>
+          <input type="text" id="fd交付类型" placeholder="如 数据建设、一次性" />
+        </div>
+        <div class="form-row">
+          <label>产线</label>
+          <input type="text" id="fd产线" placeholder="如 项目4-整体" />
+        </div>
+        <div class="form-row">
+          <label>需求团队</label>
+          <input type="text" id="fd需求团队" />
+        </div>
+        <div class="form-row">
+          <label>需求人</label>
+          <input type="text" id="fd需求人" />
+        </div>
+        <div class="form-row">
+          <label>工时（h）</label>
+          <input type="text" id="fd工时" placeholder="数字" />
+        </div>
+        <div class="form-row">
+          <label>分类</label>
+          <input type="text" id="fd分类" />
+        </div>
+        <div class="form-row">
+          <label>细项分类</label>
+          <input type="text" id="fd细项分类" />
+        </div>
+      </div>
+      <div class="form-row">
+        <label>要解决的问题</label>
+        <textarea id="fd要解决的问题" placeholder="选填"></textarea>
+      </div>
+      <div class="form-row">
+        <label>需求内容</label>
+        <textarea id="fd需求内容" placeholder="选填"></textarea>
+      </div>
+      <div class="form-row">
+        <label>备注</label>
+        <textarea id="fd备注" placeholder="选填，可填链接"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" id="addDemandCancel">取消</button>
+      <button type="button" class="btn btn-primary" id="addDemandSubmit">提交</button>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="batchModalMask"></div>
+  <div class="modal-box" id="batchModal">
+    <div class="modal-header">批量新增需求</div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: #6b7280; margin: 0 0 16px;">请先下载模板，按表头填写数据后上传。每行必填：<strong>排期周、BI、需求名称、交付类型、需求优先级、当前状态</strong>，验证通过后才会添加。</p>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <button type="button" class="btn btn-secondary" id="batchBtnTemplate">下载 CSV 模板</button>
+        <button type="button" class="btn btn-primary" id="batchBtnUpload">上传 CSV</button>
+        <input type="file" id="batchFileInput" accept=".csv,.txt" style="display: none;" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" id="batchModalClose">关闭</button>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="verifyModalMask"></div>
+  <div class="modal-box" id="verifyModal">
+    <div class="modal-header">身份验证</div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: #6b7280; margin: 0 0 12px;">修改状态需验证身份。</p>
+      <div class="form-row">
+        <label>请输入神秘代码</label>
+        <input type="text" id="verifyCodeInput" placeholder="请输入神秘代码" autocomplete="off" inputmode="numeric" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" id="verifyModalClose">取消</button>
+      <button type="button" class="btn btn-primary" id="verifyModalConfirm">确定</button>
+    </div>
+  </div>
+
+  <script type="text/template" id="defaultCsv">
+排期周,产线,BI,要解决的问题,需求名称,需求内容,交付类型,需求优先级,当前状态,需求团队,需求人,工时（h）,分类,细项分类,备注
+26w12,项目4-整体,毛思圆,,新品收入预测模型,,3 分析,P1,待排期,,陈苗,,,,
+26w12,项目4-整体,毛思圆,,新品收入分析,,3 分析,P0,进行中,,陈苗,,,,
+26w12,项目4-整体,毛思圆、杜宾彬、徐誉绮,,p端周会数据,,4 一次性数据,P1,进行中,,陈苗,,,,
+26w11,项目4-整体,毛思圆,,战役四复盘数据,1）因指标设计,4 一次性数据,P0,进行中,,EMT,,,,
+26w11,项目4-子项1-泛娱乐,毛思圆,,擦边内容测算的合理性校验,,4 一次性数据,P1,待排期,,可心,,,,
+26w11,项目4-整体,毛思圆、杜宾彬,,p端周会材料,,4 一次性数据,P1,进行中,,陈苗,,,,
+26w7,项目4-整体,毛思圆、杜宾彬,,p端周会材料,,4 一次性数据,P1,已结束,,陈苗,,,,
+26w7,项目4-整体,毛思圆,,p端BSC看板,1）给数仓提需求,2 数据/产品应用建设,P1,已结束,,EMT,,,,
+26w6,项目4-子项1-新品,毛思圆,,项目指标/目标修改,查漏补缺,1 指标化,P0,已结束,,EMT,,,,
+26w7,项目4-子项1-新品,毛思圆，卢嘉睿,"等业务对齐（窦方，yehua, 刘佳，思圆）",大师课归因专辑逻辑,"1）梳理逻辑
+2）查下逻辑是否有问题
+3）和业务讨论新归属规则
+4）数仓开发",2 数据/产品应用建设,P1,已结束,,陈苗,,,,
+26w6,项目4-子项1-新品,毛思圆，卢嘉睿,,大师课归因专辑逻辑,"1）梳理逻辑
+2）查下逻辑是否有问题
+3）和业务讨论新归属规则
+4）数仓开发",2 数据/产品应用建设,P1,已结束,,陈苗,,,,
+26w7,项目4-子项1-新品,毛思圆、杜宾彬,,儿童业务核心数据,"1）了解儿童核心指标/看板
+2）推动落实对接儿童的数仓
+3）规划26年的看板，整合儿童数据",2 数据/产品应用建设,P1,已结束,,王洁,,,,
+26w12,项目4-整体,杜宾彬,,喜马头部市场占有率口径迭代,"1）迭代为网文市场占有率和泛价值市场占有率
+",1 指标化,P1,进行中,,欧阳,,,,
+26w12,项目4-整体,杜宾彬,,新品深度播放率,"1）新品深度播放率日维度数据
+2）验证同一在架时长不同评级专辑是否有差异
+",3 分析,P0,进行中,,思圆,,,,
+26w12,项目4-整体,杜宾彬,,p端BSC看板,"1）内容整体-核心指标/完成情况看板已完成
+2）子项底表验数通过，25年数据回刷中，看板结构已搭建完毕
+3）主播指标口径仍在迭代",2 数据/产品应用建设,P0,进行中,,陈苗,,,,
+26w12,项目4-整体,杜宾彬,,p端监控看板迭代,"1）底表已按新产线回刷
+2）部分数据模型需调整字段和展示格式",2 数据/产品应用建设,P1,进行中,,陈苗,,,,
+26w11,项目4-整体,杜宾彬,,p端BSC看板,"1）内容整体-核心指标/完成情况看板已完成
+2）梁涵&叶骅产线划分周三下班前给讨论结果
+3）子项看板最晚本周五交付数据，下周二前交付看板",2 数据/产品应用建设,P0,进行中,,陈苗,,,,
+26w11,项目4-整体,杜宾彬,,p端BSC实验增量IU测算,按汉义逻辑测算，进组人数,4 一次性数据,P1,待排期,,欧阳,,,,
+26w11,项目4-整体,杜宾彬,,喜马头部市场占有率口径迭代,"1）确认当前具体口径及卡点
+2）在周三周会前争取有具体迭代方向",1 指标化,P1,进行中,,欧阳,,,,
+26w10,项目4-整体,杜宾彬,,p端BSC看板,"1）收入底表已验收完成
+2）核心指标本周二3.3交付数据，本周五3.6交付看板",2 数据/产品应用建设,P0,进行中,,陈苗,,,,
+26w10,项目4-整体,杜宾彬,,p端BSC复盘-实验,"1）未进入holdbase实验正常测算
+2）Q1holdbase数据异常，已推全实验按推全前数据估算",4 一次性数据,P0,进行中,,陈苗,,,,
+26w9,项目4-子项1-新品,杜宾彬,,儿童业务核心数据底表与看板数据验证,"1）了解儿童核心指标/看板
+",2 数据/产品应用建设,P1,待排期,,王洁,,,,
+26w9,项目4-整体,杜宾彬,,p端BSC看板,"1）核心指标已给数仓提需
+2）收入底表已查验，小会员和激励广告收入不一致
+3）儿童版权数据数仓建立飞块表中",2 数据/产品应用建设,P0,进行中,,陈苗,,,,
+26w7,项目4-整体,杜宾彬,,P端监控收入底表口径调整,"1）同步数仓，整理相关下游表
+2）同步业务调整",2 数据/产品应用建设,P0,已结束,,陈苗,,,,
+26w6,项目4-子项1-新品,毛思圆,,深度播放率因指标拆解,,3 分析,P1,已结束,,,,,,
+26w6,项目2-子项3-高潜,杜宾彬,,泛价值搜推分发现状数据,"1）曝光量、曝光量占比
+2）点击率
+3）人均有效播放次数",4 一次性数据,P1,已结束,,晓蓉、丽霞,,,,
+26w6,项目4-子项1-新品,杜宾彬,,BSC新品数据拆分产线,"1）新品大会员收入、激励广告收入
+2）新品深度播放率",4 一次性数据,P0,已结束,,叶骅,,,,
+26w6,项目4-整体,毛思圆、杜宾彬,,免费eDAU拆解,"1）看过激励广告的eDAU
+2）灰补eDAU",4 一次性数据,P0,已结束,,陈苗,,,,
+26w7,项目4-子项4-人机,卢嘉睿,"AI新型创作者：以下类型专辑（含自制AI、非自制AI、观点型原创）的播放时长占比 > 25%的主播
+
+口径：
+自制AI：通过音色判断为AI，制作人参与（包括选题引导、专辑优化等）
+非自制AI：通过音色判断为AI，无制作人参与
+观点型原创： 音色判断为真人，真人讲解，内容通过AI工具生产（默认包含AI工具）
+真人演绎：音色判断为真人，真人演播，非观点型内容",AI新型创作者指标定义拉齐,对齐AI新型创作者对于"真人原创"标签的定义 ✅,1 指标化,P0,已结束,,梁涵,,,,
+26w6,项目4-子项4-人机,卢嘉睿,,AI新型创作者指标定义拉齐,,1 指标化,P0,已结束,,梁涵,,,,
+26w7,项目2-子项3-高潜,卢嘉睿,"① 周会数据准备；追踪当前进度
+② 测算激励广告分成新口径： 当前免费专辑在激励广告分成中收入为0； 测算按照消耗时长逻辑主播可获得的分成收入 
+",激励广告相关需求,,1 指标化,P0,已结束,,晓蓉、Bill,,,,
+26w12,其他,卢嘉睿,按照新的组织架构，迭代成本收入看板,成本收入看板迭代,成本收入看板迭代（预计 3月底完成）,2 数据/产品应用建设,P0,进行中,,舒珺,,,,
+26w12,项目4-子项2-泛价值,卢嘉睿,泛价值业务诊断需求：收入结构、流量结构、用户结构 等等,业务诊断扫描,泛价值「BSC+诊断清单」盘点需求提供泛价值各项结构数据，帮助业务了解泛机制的基础情况； 第二轮补充数据【待对齐沟通】,4 一次性数据,P0,进行中,,杨震、梁涵,,,,
+26w12,项目4-子项2-泛价值,卢嘉睿,泛价值商财IU年同比下跌，初步下拆专辑分布,商财IU年同比下降初步拆解,商财IU年同比降幅 25%+， 下拆IU下降的专辑分布情况（主要是头部降低 or 整体降低；头部降低提供专辑明细 ）,4 一次性数据,P0,进行中,,叶骅、梁涵,,,,
+26w12,项目4-子项2-泛价值,卢嘉睿,协同财务、业务、数仓： 对于泛价值免费专辑进行激励广告分成,"激励广告分成对齐
+","本周验收数仓底表 --> 与业务/财务再对齐 --> 按照新的规则发放金额
+激励广告收入当前口径",2 数据/产品应用建设,P0,进行中,,,,,,
+26w11,项目4-子项2-泛价值,卢嘉睿,泛价值业务诊断需求：收入结构、流量结构、用户结构 等等,提供泛价值各项结构数据，帮助业务了解泛机制的基础情况,泛价值「BSC+诊断清单」盘点需求,4 一次性数据,P0,进行中,,杨震、梁涵,,,,
+26w11,其他,卢嘉睿,按照新的组织架构，迭代成本收入看板,成本收入看板迭代预计 3月底完成,成本收入看板迭代,2 数据/产品应用建设,P0,进行中,,舒珺,,,,
+26w11,项目4-子项2-泛价值,卢嘉睿,"搭建Agent, 监控头腰主播主播的活跃度情况，提前预警主播流失",头腰高潜主播数 Agent 搭建,"搭建Agent, 监控头腰主播主播的活跃度情况",2 数据/产品应用建设,P0,进行中,,Eden,,,,
+26w10,项目4-子项2-泛价值,卢嘉睿,AI新型主播数：指标拆解与追踪； 和Eden/ 杨震对齐口径,BSC指标-过程指标监控,AI 新型主播数： 年收入大于 2W； 专辑的完播、质量分不低于同类目均值;提供过程指标 --- 单月收入达 XX,2 数据/产品应用建设,P0,进行中,,Eden,,,,
+26w10,项目2-子项3-高潜,卢嘉睿,免费专辑激励广告项目： 提供流量相关一次性数据，帮助业务监测,流量相关指标监控,e.g. DAU3渗透率、人均有效播放次数,4 一次性数据,P0,进行中,,晓蓉、丽霞,,,,
+26w14,项目4-整体,毛思圆,,BSC迭代（公司spec）,"1）战役四&子项 bsc指标
+2）Q2目标",,,,,,,,,,
+26w14,项目4-整体,毛思圆,,Agent 产出节奏,内容侧agent 规划,,,,,,,,,,
+26w14,项目4-整体,毛思圆,,p端周会,,,,,,,,,,,
+26w14,项目4-整体,毛思圆,,新品收入预测,,,,,,,,,,,
+26w14,项目4-整体,毛思圆,,整理INN看板,1）本周完成名单梳理,,,,,,,,,,,
+26w13,项目4-整体,毛思圆,,新品收入分析框架&看板化,"1）拆解分析框架
+2）看板化",2 数据/产品应用建设,P1,进行中,,陈苗,,,,,
+26w13,项目4-整体,毛思圆,,p端周会数据,"1)  深度播放率拆解
+2）头部潜力主播口径调整
+3）市占率：N确定，新增平台数据质量评估
+4）holdbase校验-善耕",4 一次性数据,P1,进行中,,陈苗,,,,,
+26w13,项目4-整体,毛思圆,,整理INN看板,,2 数据/产品应用建设,P1,进行中,,陈苗,,,,,
+26w13,项目4-整体,毛思圆,,bsc看板验收&通知,,2 数据/产品应用建设,P1,进行中,,陈苗,,,,,
+26w14,项目4-整体,杜宾彬,,新品深度播放率,"1）验证同一在架时长不同评级专辑是否有差异
+
+整理说明文档",3 分析,P0,进行中,,思圆,,新品深度播放率分析,,,
+26w14,项目4-整体,杜宾彬,,亲子可控版权新品收入占比分析,拆新品收入和单专辑拉新收入下钻一下,3 分析,P0,进行中,,思圆,,,,,
+26w14,项目4-整体,杜宾彬,,新品非AB增量策略整理,"1）整理三种策略及各自优缺点
+",其他,P1,进行中,,思圆,,,,https://qbi.ximalaya.com/dashboard/view/pc.htm?pageId=4d72ed95-3686-4b45-ab2d-dceabccd5b27
+26w14,其他,杜宾彬,,版权取数需求,"需要合同-版权-专辑维度数据，现有自助取数平台无法满足一次性需求，短期内用xql、长期沟通数仓落表、迭代自助取数平台，搭建看板",2 数据/产品应用建设,P1,待排期,,汪敏,,,,,
+26w14,其他,杜宾彬,,bsc指标skill,跑通理解业务问题-确认口径-产出xql的步骤,2 数据/产品应用建设,P1,待排期,,,,,,,,
+26w13,项目4-整体,杜宾彬,,新品深度播放率,"1）验证同一在架时长不同评级专辑是否有差异
+2）pgc中D级是否需要剔除？
+",3 分析,P0,进行中,,思圆,,,,https://qbi.ximalaya.com/dashboard/view/pc.htm?pageId=4d72ed95-3686-4b45-ab2d-dceabccd5b27
+26w13,项目4-整体,杜宾彬,,新品非AB增量策略整理,"1）整理三种策略及各自优缺点
+",其他,P1,进行中,,思圆,,,,https://qbi.ximalaya.com/dashboard/view/pc.htm?pageId=4d72ed95-3686-4b45-ab2d-dceabccd5b27
+26w13,项目4-子项4-天鉴,杜宾彬,,新用户优质内容池实验增量IU测算,1、2月无增量，3月日均增量IU1875,4 一次性数据,P1,已结束,,思圆,,,,https://qbi.ximalaya.com/dashboard/view/pc.htm?pageId=4d72ed95-3686-4b45-ab2d-dceabccd5b27
+26w13,项目4-整体,杜宾彬,,喜马头部市场占有率口径迭代、需求引擎等指标迭代,"1）迭代为网文市场占有率和泛价值市场占有率
+2）验证网文/泛价值标签是否准确
+3）验证起点等平台数据是否可用",1 指标化,P1,进行中,,欧阳,,,,,
+26w14,项目4-子项2-泛价值,卢嘉睿,,大师课归因专辑逻辑梳理,"✅   已梳理当前大师课口径逻辑： 大师课专辑归因逻辑
+【ING】：P端HR  拉会沟通 ； BI 和 叶骅对齐调整方法，数仓构建测算底表",1 指标化,P0,进行中,,杨震、叶骅,,,,,
+26w14,其他,卢嘉睿,按照新的组织架构，迭代成本收入看板,成本收入看板迭代,"✅ 看板已完成：https://qbi.ximalaya.com/dashboard/view/pc.htm?pageId=2f955cea-f785-4b31-a1cf-145ac3ccba91&dd_orientation=auto ；待发布",2 数据/产品应用建设,P0,进行中,,舒珺,,,,,
+26w14,项目2-子项3-高潜,卢嘉睿,,高潜价值激励广告项目指标迭代,按照最新战役，迭代子项指标,1 指标化,P0,进行中,,晓荣,,,,,
+26w13,其他,卢嘉睿,按照新的组织架构，迭代成本收入看板,成本收入看板迭代,成本收入看板迭代（预计 3月底完成）,2 数据/产品应用建设,P0,进行中,,舒珺,,,,,
+26w13,项目4-子项2-泛价值,卢嘉睿,搭建泛价值看板,泛价值看板搭建,按照最新泛价值组织架构，搭建整体看板,2 数据/产品应用建设,P0,进行中,,杨震、梁涵,,,,,
+26w13,项目4-子项2-泛价值,卢嘉睿,,大师课归因专辑逻辑梳理,现有收入归因到大师课不准确； 业务希望可以把大师课收入纳入到新品收入中,1 指标化,P0,进行中,,杨震、叶骅,,,,,
+26w14,项目4-整体,徐誉绮,,P端BSC看板迭代,进入Q2后，看板需调整展示Q2完成进度,2 数据/产品应用建设,P0,进行中,,陈苗,,,,,
+26w13,项目4-子项2-泛价值,徐誉绮,,新增头部&高潜&AI新型流失率 目标修改,根据口径修改后的流失率表现，重新制定头部&高潜&AI新型创作者整体流失率、及各赛道流失率在Q1，Q2，全年的目标值,1 指标化,P0,已结束,,Eden,,,,,
+26w14,项目4-子项2-泛价值,徐誉绮,,创作者业务管理报表 修改,"由于头腰尾及高潜口径变更，此前相关数据需要回刷，看板也要修改
+目前主播收入按受益人ID归因，有特殊账号类型需要额外计算，本周确定口径",2 数据/产品应用建设,P1,Delay,,Eden,,,,,
+26w14,项目4-子项2-泛价值,徐誉绮,,头部/高潜/AI新型创作者 增长预测,确定一套新增创作者监测体系，能够及时识别即将跃迁的创作者，方便沉淀机制化的扶持策略,3 分析,P1,待排期,,Eden,,,,,
+26w13,其他,徐誉绮,,IP Agent 问卷配置,,其他,P1,进行中,,万碧佳,,,,,
+</script>
+  <script>
+(function () {
+  var REQUIRED_COLS = ["排期周", "BI", "需求名称", "交付类型", "需求优先级", "当前状态"];
+  var ALL_COLS = ["排期周","产线","BI","要解决的问题","需求名称","需求内容","交付类型","需求优先级","当前状态","需求团队","需求人","工时（h）","分类","细项分类","备注"];
+  var FORM_FIELD_MAP = { "fd排期周": "排期周", "fd产线": "产线", "fdBI": "BI", "fd要解决的问题": "要解决的问题", "fd需求名称": "需求名称", "fd需求内容": "需求内容", "fd交付类型": "交付类型", "fd需求优先级": "需求优先级", "fd当前状态": "当前状态", "fd需求团队": "需求团队", "fd需求人": "需求人", "fd工时": "工时（h）", "fd分类": "分类", "fd细项分类": "细项分类", "fd备注": "备注" };
+  var STORAGE_KEY = "bi_demand_board_data";
+  /** 与下方 defaultCsv 同步：每次更新内嵌需求数据并发布到 GitHub Pages 时，把版本号 +1（或改日期），所有人会自动清空旧 localStorage 并加载新内嵌数据 */
+  var EMBEDDED_DATA_VERSION = "20260403-2";
+  var STORAGE_VERSION_KEY = "bi_demand_board_embed_version";
+  var SECRET_CODES = ["10025719", "10889", "10029904", "23810", "10029007"];
+  var rawData = [];
+  var filteredData = [];
+  var sortKey = "需求优先级";
+  var sortDir = 1;
+  var viewMode = "list";
+  var chipP01 = false;
+  var chipMine = false;
+  var myName = "";
+  var currentDrawerIndex = -1;
+  var pendingAfterVerify = null;
+
+  /** 26w8 之前的需求统一设为已结束 */
+  function normalizePastWeeksStatus() {
+    rawData.forEach(function (r) {
+      var w = (r["排期周"] || "").trim();
+      var m = w.match(/^(\d+)w(\d+)$/);
+      if (m) {
+        var y = parseInt(m[1], 10);
+        var ww = parseInt(m[2], 10);
+        if (y < 26 || (y === 26 && ww < 8)) r["当前状态"] = "已结束";
+      }
+    });
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function parseCSV(text) {
+    var sep = text.indexOf("\t") >= 0 ? "\t" : ",";
+    var rows = [];
+    var row = [];
+    var cell = "";
+    var inQuotes = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (c === '"') {
+        if (inQuotes && text[i + 1] === '"') { cell += '"'; i++; continue; }
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (!inQuotes) {
+        if (c === sep) {
+          row.push(cell.trim().replace(/^["']|["']$/g, ""));
+          cell = "";
+          continue;
+        }
+        if (c === "\n" || (c === "\r" && text[i + 1] === "\n")) {
+          if (c === "\r") i++;
+          row.push(cell.trim().replace(/^["']|["']$/g, ""));
+          if (row.length > 0 || cell.length > 0) rows.push(row);
+          row = [];
+          cell = "";
+          continue;
+        }
+        if (c === "\r") {
+          row.push(cell.trim().replace(/^["']|["']$/g, ""));
+          if (row.length > 0 || cell.length > 0) rows.push(row);
+          row = [];
+          cell = "";
+          continue;
+        }
+      }
+      cell += c;
+    }
+    if (row.length > 0 || cell.length > 0) {
+      row.push(cell.trim().replace(/^["']|["']$/g, ""));
+      rows.push(row);
+    }
+    if (rows.length < 1) return null;
+    var headers = rows[0].map(function (h) { return (h || "").trim().replace(/^\s*["']|["']\s*$/g, ""); });
+    for (var k = 0; k < REQUIRED_COLS.length; k++) {
+      if (headers.indexOf(REQUIRED_COLS[k]) < 0) return { error: "列名不匹配，请检查是否包含'" + REQUIRED_COLS[k] + "'字段。" };
+    }
+    var out = [];
+    for (var r = 1; r < rows.length; r++) {
+      var obj = {};
+      for (var c = 0; c < headers.length; c++) obj[headers[c]] = (rows[r][c] || "").trim().replace(/^["']|["']$/g, "");
+      out.push(obj);
+    }
+    return { headers: headers, rows: out };
+  }
+  function toast(msg, isError) {
+    var el = $("toast");
+    el.textContent = msg;
+    el.classList.toggle("error", !!isError);
+    el.classList.add("show");
+    setTimeout(function () { el.classList.remove("show"); }, 3000);
+  }
+  function getWeeks() {
+    var set = {};
+    rawData.forEach(function (r) {
+      var w = r["排期周"] || "";
+      if (w) set[w] = 1;
+    });
+    return Object.keys(set).sort(function (a, b) {
+      var ma = (a || "").match(/^(\d+)w(\d+)$/);
+      var mb = (b || "").match(/^(\d+)w(\d+)$/);
+      if (!ma || !mb) return (a || "").localeCompare(b || "");
+      var ya = parseInt(ma[1], 10);
+      var wa = parseInt(ma[2], 10);
+      var yb = parseInt(mb[1], 10);
+      var wb = parseInt(mb[2], 10);
+      if (ya !== yb) return yb - ya;
+      return wb - wa;
+    });
+  }
+  function getWeeklyTotals() {
+    var weeks = getWeeks().slice().reverse();
+    var countByWeek = {};
+    rawData.forEach(function (r) {
+      var w = (r["排期周"] || "").trim();
+      if (w) countByWeek[w] = (countByWeek[w] || 0) + 1;
+    });
+    return {
+      labels: weeks,
+      counts: weeks.map(function (w) { return countByWeek[w] || 0; })
+    };
+  }
+  /** 某周各优先级数量，用于趋势图 tooltip */
+  function getPriorityCountsForWeek(weekLabel) {
+    var rows = rawData.filter(function (r) { return (r["排期周"] || "").trim() === weekLabel; });
+    var p0 = 0, p1 = 0, p2 = 0, p3 = 0;
+    rows.forEach(function (r) {
+      var p = (r["需求优先级"] || "").toUpperCase();
+      if (p === "P0") p0++; else if (p === "P1") p1++; else if (p === "P2") p2++; else if (p === "P3") p3++;
+    });
+    return { total: rows.length, P0: p0, P1: p1, P2: p2, P3: p3 };
+  }
+  var trendChartInstance = null;
+  function updateTrendChart() {
+    if (typeof Chart === "undefined") return;
+    var canvas = document.getElementById("trendChartCanvas");
+    var card = document.getElementById("trendChartCard");
+    if (!canvas || !card) return;
+    var data = getWeeklyTotals();
+    if (data.labels.length === 0) {
+      card.style.display = "none";
+      if (trendChartInstance) { trendChartInstance.destroy(); trendChartInstance = null; }
+      return;
+    }
+    card.style.display = "block";
+    var ctx = canvas.getContext("2d");
+    if (trendChartInstance) trendChartInstance.destroy();
+    var gradient = ctx.createLinearGradient(0, 0, 0, 220);
+    gradient.addColorStop(0, "rgba(139, 92, 246, 0.35)");
+    gradient.addColorStop(0.6, "rgba(139, 92, 246, 0.08)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    trendChartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: "需求数",
+          data: data.counts,
+          borderColor: "#7c3aed",
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.35,
+          pointBackgroundColor: "#7c3aed",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: false,
+            external: function (context) {
+              var el = document.getElementById("trendChartTooltip");
+              if (!el) return;
+              var tooltip = context.tooltip;
+              if (tooltip.opacity === 0) {
+                el.style.display = "none";
+                return;
+              }
+              var weekLabel = tooltip.dataPoints && tooltip.dataPoints[0] ? tooltip.dataPoints[0].label : "";
+              var c = getPriorityCountsForWeek(weekLabel);
+              var totalLine = "<span style=\"color:#7c3aed;font-weight:600\">总数量：" + c.total + "</span>";
+              var priorityParts = [];
+              if (c.P0 > 0) priorityParts.push("<span style=\"color:#991B1B;font-weight:600\">P0：" + c.P0 + "</span>");
+              if (c.P1 > 0) priorityParts.push("<span style=\"color:#9A3412;font-weight:600\">P1：" + c.P1 + "</span>");
+              if (c.P2 > 0) priorityParts.push("<span style=\"color:#64748b;font-weight:600\">P2：" + c.P2 + "</span>");
+              if (c.P3 > 0) priorityParts.push("<span style=\"color:#64748b;font-weight:600\">P3：" + c.P3 + "</span>");
+              el.innerHTML = totalLine + (priorityParts.length > 0 ? "<br>" + priorityParts.join("　") : "");
+              el.style.display = "block";
+              el.style.left = (tooltip.caretX - el.offsetWidth / 2) + "px";
+              el.style.top = (tooltip.caretY - el.offsetHeight - 10) + "px";
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, color: "#64748b", maxRotation: 45 }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(0,0,0,0.06)" },
+            ticks: { font: { size: 11 }, color: "#64748b", stepSize: 1 }
+          }
+        }
+      }
+    });
+  }
+  function getLines() {
+    var set = {};
+    rawData.forEach(function (r) {
+      var l = r["产线"] || "";
+      if (l) set[l] = 1;
+    });
+    return Object.keys(set).sort();
+  }
+  function getStatuses() {
+    var set = {};
+    rawData.forEach(function (r) {
+      var s = r["当前状态"] || "";
+      if (s) set[s] = 1;
+    });
+    return Object.keys(set).sort();
+  }
+  function defaultWeeks() {
+    var weeks = getWeeks();
+    return weeks.slice(0, 3);
+  }
+  function applyFilters() {
+    var search = ($("searchInput").value || "").trim().toLowerCase();
+    var week = $("filterWeek").value;
+    var line = $("filterLine").value;
+    var status = $("filterStatus").value;
+    var latest3 = week === "__latest3__" ? defaultWeeks() : null;
+    filteredData = rawData.filter(function (r) {
+      if (latest3 && latest3.length > 0 && latest3.indexOf(r["排期周"] || "") < 0) return false;
+      if (week && week !== "__latest3__" && (r["排期周"] || "") !== week) return false;
+      if (line && (r["产线"] || "") !== line) return false;
+      if (status && (r["当前状态"] || "") !== status) return false;
+      if (chipP01) {
+        var p = (r["需求优先级"] || "").toUpperCase();
+        if (p !== "P0" && p !== "P1") return false;
+      }
+      if (chipMine && myName) {
+        var biList = (r["BI"] || "").split(/[、，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+        if (biList.indexOf(myName) < 0) return false;
+      }
+      if (search) {
+        var name = (r["需求名称"] || "").toLowerCase();
+        var content = (r["需求内容"] || "").toLowerCase();
+        var problem = (r["要解决的问题"] || "").toLowerCase();
+        var remark = (r["备注"] || "").toLowerCase();
+        var bi = (r["BI"] || "").toLowerCase();
+        if (name.indexOf(search) < 0 && content.indexOf(search) < 0 && problem.indexOf(search) < 0 && remark.indexOf(search) < 0 && bi.indexOf(search) < 0) return false;
+      }
+      return true;
+    });
+    if (sortKey) {
+      filteredData.sort(function (a, b) {
+        var va = a[sortKey] || "", vb = b[sortKey] || "";
+        if (sortKey === "需求优先级") {
+          var order = { P0: 0, P1: 1, P2: 2, P3: 3 };
+          va = order[(va || "").toUpperCase()] ?? 9;
+          vb = order[(vb || "").toUpperCase()] ?? 9;
+          return sortDir * (va - vb);
+        }
+        if (sortKey === "排期周") return sortDir * (String(va).localeCompare(String(vb)));
+        return sortDir * (String(va).localeCompare(String(vb)));
+      });
+    }
+    render();
+  }
+  function priorityClass(p) {
+    p = (p || "").toUpperCase();
+    if (p === "P0") return "tag-p0";
+    if (p === "P1") return "tag-p1";
+    return "tag-p2";
+  }
+  var LINE_COLORS = {
+    "项目4-整体": "#fef08a",
+    "项目4-子项1-泛娱乐": "#ddd6fe",
+    "项目4-子项2-泛价值": "#fed7aa",
+    "项目4-子项3-亲子": "#bbf7d0",
+    "项目4-子项4-天鉴": "#fbcfe8",
+    "项目4-子项4-人机": "#fbcfe8",
+    "项目4-子项1-新品": "#ddd6fe",
+    "项目2-子项3-高潜": "#a5f3fc",
+    "项目3-子项2-供给": "#d9f99d",
+    "其他": "#f1f5f9"
+  };
+  function lineTag(line) {
+    var text = (line || "").trim() || "-";
+    var bg = LINE_COLORS[text] || "#f1f5f9";
+    return "<span class=\"tag tag-line\" style=\"background:" + bg + "\">" + (text.replace(/</g, "&lt;")) + "</span>";
+  }
+  function biAvatars(bi) {
+    if (!(bi || "").trim()) return "<span class=\"avatar\">?</span>";
+    var names = (bi || "").split(/[、，]/).map(function (n) { return n.trim(); }).filter(Boolean);
+    if (names.length === 0) return "<span class=\"avatar\">?</span>";
+    return "<span class=\"avatar-wrap\">" + names.map(function (n) { return "<span class=\"avatar\" title=\"" + (n.replace(/"/g, "&quot;")) + "\">" + (n.charAt(0) || "?") + "</span>"; }).join("") + "</span>";
+  }
+  function statusClass(s) {
+    s = (s || "").trim();
+    if (s === "进行中") return "tag-进行中";
+    if (s === "已结束" || s === "已完成") return "tag-已结束";
+    if (s === "Delay") return "tag-Delay";
+    return "tag-待排期";
+  }
+  function str(str, len) {
+    str = (str || "").trim();
+    if (len && str.length > len) return str.slice(0, len) + "…";
+    return str;
+  }
+  function getBiCountsLast3Weeks() {
+    var last3 = defaultWeeks();
+    if (last3.length === 0) return [];
+    var countByBi = {};
+    rawData.forEach(function (r) {
+      if (last3.indexOf((r["排期周"] || "").trim()) < 0) return;
+      var biStr = (r["BI"] || "").trim();
+      if (!biStr) { countByBi["未分配"] = (countByBi["未分配"] || 0) + 1; return; }
+      var names = biStr.split(/[、，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      names.forEach(function (n) { countByBi[n] = (countByBi[n] || 0) + 1; });
+    });
+    return Object.keys(countByBi).map(function (name) { return { name: name, count: countByBi[name] }; }).sort(function (a, b) { return b.count - a.count; });
+  }
+  function getLineCountsLast3Weeks() {
+    var last3 = defaultWeeks();
+    if (last3.length === 0) return { labels: [], counts: [] };
+    var countByLine = {};
+    rawData.forEach(function (r) {
+      if (last3.indexOf((r["排期周"] || "").trim()) < 0) return;
+      var line = (r["产线"] || "").trim() || "其他";
+      countByLine[line] = (countByLine[line] || 0) + 1;
+    });
+    var lines = Object.keys(countByLine).sort(function (a, b) {
+      var d = (countByLine[b] || 0) - (countByLine[a] || 0);
+      return d !== 0 ? d : (a || "").localeCompare(b || "");
+    });
+    return { labels: lines, counts: lines.map(function (l) { return countByLine[l] || 0; }) };
+  }
+  function escapeAttr(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  }
+  function renderLeftLineList() {
+    var container = $("leftLineList");
+    var card = $("leftLineListCard");
+    if (!container || !card) return;
+    var data = getLineCountsLast3Weeks();
+    if (data.labels.length === 0) {
+      card.style.display = "none";
+      container.innerHTML = "";
+      return;
+    }
+    card.style.display = "block";
+    var cur = ($("filterLine") && $("filterLine").value) || "";
+    container.innerHTML = data.labels.map(function (line, i) {
+      var cnt = data.counts[i];
+      var safe = (line || "").replace(/</g, "&lt;");
+      var bg = LINE_COLORS[line] || "#e2e8f0";
+      var active = cur === line ? " active" : "";
+      return "<div class=\"line-list-item" + active + "\" data-line=\"" + escapeAttr(line) + "\" title=\"点击按产线筛选，再点取消\"><span class=\"line-list-dot\" style=\"background:" + bg + "\"></span><span class=\"line-list-name\">" + safe + "</span><span class=\"line-list-badge\">" + cnt + "</span></div>";
+    }).join("");
+    container.querySelectorAll(".line-list-item[data-line]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var line = this.getAttribute("data-line");
+        var sel = $("filterLine");
+        if (!sel) return;
+        if (sel.value === line) sel.value = "";
+        else sel.value = line;
+        applyFilters();
+      });
+    });
+  }
+  function renderLeftNav() {
+    var list = $("leftNavList");
+    if (!list) return;
+    var items = getBiCountsLast3Weeks();
+    if (items.length === 0) {
+      list.innerHTML = "<div class=\"nav-item\" style=\"cursor:default;color:var(--text-muted)\">暂无数据</div>";
+      return;
+    }
+    list.innerHTML = items.map(function (item) {
+      var active = myName === item.name ? " active" : "";
+      var initial = (item.name.charAt(0) || "?").replace(/</g, "&lt;");
+      return "<div class=\"nav-item" + active + "\" data-name=\"" + (item.name.replace(/"/g, "&quot;")) + "\" title=\"点击筛选该负责人的需求\"><div class=\"nav-item-icon\">" + initial + "</div><div class=\"nav-item-info\"><div class=\"nav-item-name\">" + (item.name.replace(/</g, "&lt;")) + "</div><div class=\"nav-item-count\">近三周 " + item.count + " 项</div></div><div class=\"nav-item-badge\">" + item.count + "</div></div>";
+    }).join("");
+    list.querySelectorAll(".nav-item[data-name]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var name = this.getAttribute("data-name");
+        myName = myName === name ? "" : name;
+        chipMine = !!myName;
+        var chip = $("chipMine");
+        if (chip) chip.classList.toggle("active", chipMine);
+        list.querySelectorAll(".nav-item").forEach(function (n) { n.classList.remove("active"); if (n.getAttribute("data-name") === myName) n.classList.add("active"); });
+        applyFilters();
+      });
+    });
+  }
+  function updateCalendar() {
+    var today = new Date();
+    var y = today.getFullYear();
+    var m = today.getMonth() + 1;
+    var d = today.getDate();
+    var todayEl = $("calendarToday");
+    var weekEl = $("calendarWeek");
+    if (todayEl) todayEl.textContent = y + "年" + m + "月" + d + "日";
+    var weeks = getWeeks();
+    if (weekEl) weekEl.textContent = weeks.length > 0 ? "当前周：" + weeks[0] : "—";
+  }
+  function renderStats() {
+    var total = rawData.length;
+    var p0 = rawData.filter(function (r) { return (r["需求优先级"] || "").toUpperCase() === "P0"; }).length;
+    var done = rawData.filter(function (r) { var s = (r["当前状态"] || ""); return s === "已结束" || s === "已完成"; }).length;
+    $("statTotal").textContent = total;
+    $("statP0").textContent = total ? Math.round((p0 / total) * 100) + "%" : "0%";
+    $("statDone").textContent = total ? Math.round((done / total) * 100) + "%" : "0%";
+    var p0Bar = $("statP0Bar");
+    var doneBar = $("statDoneBar");
+    if (p0Bar) p0Bar.style.width = total ? (p0 / total) * 100 + "%" : "0%";
+    if (doneBar) doneBar.style.width = total ? (done / total) * 100 + "%" : "0%";
+    var weeks = getWeeks();
+    if (weeks.length > 0) {
+      $("currentWeekHint").textContent = "当前周：" + weeks[0];
+      $("currentWeekHint").style.display = "";
+    } else {
+      $("currentWeekHint").textContent = "";
+      $("currentWeekHint").style.display = "none";
+    }
+  }
+  function updateLandingWarning() {
+    var total = rawData.length;
+    var p0 = rawData.filter(function (r) { return (r["需求优先级"] || "").toUpperCase() === "P0"; }).length;
+    var pct = total ? (p0 / total) * 100 : 0;
+    var el = $("landingWarning");
+    if (el) el.classList.toggle("show", pct > 40);
+  }
+  function fillSelects() {
+    var weeks = getWeeks();
+    var sel = $("filterWeek");
+    sel.innerHTML = '<option value="__latest3__" selected>最近三周</option><option value="">全部排期周</option>' + weeks.map(function (w) {
+      return '<option value="' + w + '">' + w + '</option>';
+    }).join("");
+    var lineSel = $("filterLine");
+    lineSel.innerHTML = '<option value="">全部产线</option>' + getLines().map(function (l) {
+      return '<option value="' + l + '">' + l + '</option>';
+    }).join("");
+    var statusSel = $("filterStatus");
+    statusSel.innerHTML = '<option value="">全部状态</option>' + getStatuses().map(function (s) {
+      return '<option value="' + s + '">' + s + '</option>';
+    }).join("");
+  }
+  function renderList() {
+    var tbody = $("tableBody");
+    var empty = $("emptyList");
+    if (filteredData.length === 0) {
+      tbody.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    tbody.innerHTML = filteredData.map(function (r, i) {
+      var name = str(r["需求名称"]);
+      var contentPreview = str(r["需求内容"], 20);
+      var p = (r["需求优先级"] || "").trim();
+      var s = (r["当前状态"] || "").trim();
+      var bi = (r["BI"] || "").trim();
+      var problem = (r["要解决的问题"] || "").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      var contentFull = (r["需求内容"] || "").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      var title = ("要解决的问题：\n" + (r["要解决的问题"] || "") + "\n\n需求内容：\n" + (r["需求内容"] || "")).replace(/"/g, "&quot;");
+      var line = (r["产线"] || "").trim();
+      return "<tr data-i=\"" + i + "\"><td><strong>" + str(r["排期周"]) + "</strong></td><td>" + lineTag(line) + "</td><td class=\"cell-name\"><div class=\"name\">" + str(name) + "</div><div class=\"preview\">" + str(contentPreview) + "</div></td><td><span class=\"tag " + priorityClass(p) + "\">" + (p || "-") + "</span></td><td><span class=\"tag " + statusClass(s) + "\">" + (s || "-") + "</span></td><td>" + biAvatars(bi) + (bi || "-") + "</td><td>" + str(r["交付类型"]) + "</td></tr>";
+    }).join("");
+  }
+  function renderBoard() {
+    var container = $("boardColumns");
+    var empty = $("emptyBoard");
+    if (filteredData.length === 0) {
+      container.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    var byBI = {};
+    filteredData.forEach(function (r, i) {
+      var bi = (r["BI"] || "").trim() || "未分配";
+      if (!byBI[bi]) byBI[bi] = [];
+      byBI[bi].push({ r: r, i: i });
+    });
+    var html = "";
+    Object.keys(byBI).sort().forEach(function (bi) {
+      var items = byBI[bi];
+      var total = items.length;
+      var doing = items.filter(function (x) { var s = (x.r["当前状态"] || ""); return s === "进行中"; }).length;
+      html += "<div class=\"board-column\"><h3>" + bi + "</h3><div class=\"meta\">总计 " + total + " 项 · 进行中 " + doing + " 项</div>";
+      items.forEach(function (x) {
+        var r = x.r;
+        var p = (r["需求优先级"] || "").trim();
+        var line = (r["产线"] || "").trim();
+        html += "<div class=\"board-card\" data-i=\"" + x.i + "\"><div class=\"card-row\"><strong>" + str(r["排期周"]) + "</strong> " + lineTag(line) + " <span class=\"tag " + priorityClass(p) + "\">" + (p || "-") + "</span></div><div class=\"card-row\">" + str(r["需求名称"]) + "</div><div class=\"card-row\"><span class=\"tag " + statusClass(r["当前状态"]) + "\">" + (r["当前状态"] || "-") + "</span></div><div class=\"card-detail\">工时：" + (r["工时（h）"] || "-") + " · 细项：" + str(r["细项分类"]) + "<br>备注：" + str(r["备注"], 80) + "</div></div>";
+      });
+      html += "</div>";
+    });
+    container.innerHTML = html;
+  }
+  function render() {
+    renderStats();
+    renderLeftLineList();
+    renderLeftNav();
+    updateTrendChart();
+    updateCalendar();
+    if (viewMode === "list") {
+      renderList();
+      $("listView").style.display = "block";
+      $("boardView").style.display = "none";
+    } else {
+      renderBoard();
+      $("listView").style.display = "none";
+      $("boardView").style.display = "block";
+    }
+  }
+  function isValidSecretCode(code) {
+    return SECRET_CODES.indexOf((code || "").trim()) >= 0;
+  }
+  function isVerified() {
+    return typeof sessionStorage !== "undefined" && !!sessionStorage.getItem("biBoardVerified");
+  }
+  function escapeDrawerAttr(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  }
+  function escapeDrawerTextarea(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  }
+  function buildDrawerEditForm(r) {
+    var hint = "<p class=\"drawer-verified\">已通过神秘代码验证 <a href=\"#\" id=\"drawerSwitchIdentity\">退出验证</a></p>";
+    var rows = ALL_COLS.map(function (col) {
+      var v = r[col] || "";
+      var label = (col || "").replace(/</g, "&lt;");
+      var df = " data-drawer-field=\"" + escapeDrawerAttr(col) + "\"";
+      if (col === "需求优先级") {
+        var opts = ["P0", "P1", "P2", "P3"].map(function (p) {
+          return "<option value=\"" + p + "\"" + ((v || "").trim() === p ? " selected" : "") + ">" + p + "</option>";
+        }).join("");
+        return "<div class=\"form-row drawer-edit-row\"><label>" + label + "</label><select" + df + ">" + opts + "</select></div>";
+      }
+      if (col === "当前状态") {
+        var opts2 = ["待排期", "进行中", "已结束"].map(function (s) {
+          return "<option value=\"" + escapeDrawerAttr(s) + "\"" + ((v || "").trim() === s ? " selected" : "") + ">" + s + "</option>";
+        }).join("");
+        return "<div class=\"form-row drawer-edit-row\"><label>" + label + "</label><select" + df + ">" + opts2 + "</select></div>";
+      }
+      if (col === "要解决的问题" || col === "需求内容" || col === "备注") {
+        var rowsN = col === "备注" ? 3 : 5;
+        return "<div class=\"form-row drawer-edit-row\"><label>" + label + "</label><textarea" + df + " rows=\"" + rowsN + "\">" + escapeDrawerTextarea(v) + "</textarea></div>";
+      }
+      return "<div class=\"form-row drawer-edit-row\"><label>" + label + "</label><input type=\"text\"" + df + " value=\"" + escapeDrawerAttr(v) + "\" /></div>";
+    }).join("");
+    return hint + "<div class=\"drawer-edit-form\">" + rows + "</div><div class=\"drawer-edit-footer\"><button type=\"button\" class=\"btn btn-danger\" id=\"drawerDeleteDemand\">删除需求</button><button type=\"button\" class=\"btn btn-primary\" id=\"drawerSaveAll\">保存修改</button></div>";
+  }
+  function openDrawer(index) {
+    var r = filteredData[index];
+    if (!r) return;
+    currentDrawerIndex = index;
+    var p = (r["需求优先级"] || "").trim();
+    $("drawerTitle").innerHTML = "<span class=\"tag " + priorityClass(p) + "\">" + (p || "-") + "</span> " + (r["需求名称"] || "-").replace(/</g, "&lt;");
+    $("drawerSub").textContent = "状态：" + (r["当前状态"] || "-") + "  排期：" + (r["排期周"] || "-");
+    if (isVerified()) {
+      $("drawerBody").innerHTML = buildDrawerEditForm(r);
+      var saveAll = $("drawerSaveAll");
+      if (saveAll) saveAll.addEventListener("click", onDrawerSaveAll);
+      var delBtn = $("drawerDeleteDemand");
+      if (delBtn) delBtn.addEventListener("click", onDrawerDeleteDemand);
+      var switchLink = $("drawerSwitchIdentity");
+      if (switchLink) {
+        switchLink.addEventListener("click", function (e) {
+          e.preventDefault();
+          try { sessionStorage.removeItem("biBoardVerified"); } catch (x) {}
+          openDrawer(currentDrawerIndex);
+        });
+      }
+    } else {
+      var curStatus = (r["当前状态"] || "").trim();
+      var statusOpts = ["待排期", "进行中", "已结束"].map(function (s) {
+        return "<option value=\"" + s + "\"" + (s === curStatus ? " selected" : "") + ">" + s + "</option>";
+      }).join("");
+      var grid = "排期周：" + (r["排期周"] || "-") + " | 产线：" + (r["产线"] || "-") + "<br>BI：" + (r["BI"] || "-") + " | 状态：" + (r["当前状态"] || "-") + "<br>交付类型：" + (r["交付类型"] || "-") + " | 需求团队：" + (r["需求团队"] || "-") + "<br>需求人：" + (r["需求人"] || "-") + " | 工时(h)：" + (r["工时（h）"] || "-") + "<br>分类：" + (r["分类"] || "-") + " | 细项分类：" + (r["细项分类"] || "-") + "<br>";
+      var problem = (r["要解决的问题"] || "").replace(/</g, "&lt;");
+      var content = (r["需求内容"] || "").replace(/</g, "&lt;");
+      var remark = (r["备注"] || "").replace(/</g, "&lt;").replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+      var statusBlock = "<div class=\"drawer-section drawer-status-edit\"><h4>修改状态</h4><div class=\"drawer-status-row\"><select id=\"drawerStatusSelect\">" + statusOpts + "</select><button type=\"button\" class=\"btn btn-primary\" id=\"drawerStatusSave\">保存状态</button></div></div>";
+      var verifyBanner = "<div class=\"drawer-verify-banner\">验证身份后可编辑本条需求的<strong>全部字段</strong>。<button type=\"button\" class=\"btn btn-primary\" id=\"drawerBtnVerifyEdit\" style=\"margin-left:10px;padding:6px 14px;font-size:0.8125rem\">验证身份</button></div>";
+      $("drawerBody").innerHTML = verifyBanner + "<div class=\"drawer-grid\">" + grid.split("<br>").filter(Boolean).map(function (line) {
+        return "<div style=\"grid-column:1/-1\">" + line + "</div>";
+      }).join("") + "</div>" + statusBlock + "<div class=\"drawer-section\"><h4>要解决的问题</h4><div class=\"content\">" + (problem || "-") + "</div></div><div class=\"drawer-section\"><h4>需求内容</h4><div class=\"content\">" + (content || "-") + "</div></div><div class=\"drawer-section remark\"><h4>备注</h4><div class=\"content\">" + (remark || "-") + "</div></div>";
+      var saveBtn = $("drawerStatusSave");
+      if (saveBtn) saveBtn.addEventListener("click", onDrawerSaveStatus);
+      var btnVe = $("drawerBtnVerifyEdit");
+      if (btnVe) {
+        btnVe.addEventListener("click", function () {
+          pendingAfterVerify = function () { openDrawer(currentDrawerIndex); };
+          openVerifyModal();
+        });
+      }
+    }
+    $("drawer").classList.add("open");
+    $("drawerMask").classList.add("open");
+  }
+  function onDrawerSaveAll() {
+    var idx = currentDrawerIndex;
+    if (idx < 0 || !filteredData[idx]) return;
+    if (!isVerified()) {
+      pendingAfterVerify = function () { onDrawerSaveAll(); };
+      openVerifyModal();
+      return;
+    }
+    var r = filteredData[idx];
+    var rawIdx = rawData.indexOf(r);
+    if (rawIdx < 0) return;
+    var formRoot = $("drawerBody");
+    if (!formRoot) return;
+    var fields = formRoot.querySelectorAll("[data-drawer-field]");
+    for (var i = 0; i < fields.length; i++) {
+      var el = fields[i];
+      var key = el.getAttribute("data-drawer-field");
+      if (!key) continue;
+      rawData[rawIdx][key] = el.value != null ? String(el.value).trim() : "";
+    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData)); } catch (e) {}
+    applyFilters();
+    render();
+    var rowRef = rawData[rawIdx];
+    var newIdx = -1;
+    for (var j = 0; j < filteredData.length; j++) {
+      if (filteredData[j] === rowRef) { newIdx = j; break; }
+    }
+    if (newIdx >= 0) {
+      currentDrawerIndex = newIdx;
+      openDrawer(newIdx);
+    } else {
+      closeDrawer();
+    }
+    toast("已保存修改");
+  }
+  function onDrawerDeleteDemand() {
+    var idx = currentDrawerIndex;
+    if (idx < 0 || !filteredData[idx]) return;
+    if (!isVerified()) {
+      pendingAfterVerify = function () { onDrawerDeleteDemand(); };
+      openVerifyModal();
+      return;
+    }
+    var r = filteredData[idx];
+    var name = (r["需求名称"] || "").trim() || "该需求";
+    if (!confirm("确定删除「" + name + "」？删除后无法恢复。")) return;
+    var rawIdx = rawData.indexOf(r);
+    if (rawIdx < 0) {
+      toast("未找到记录，无法删除", true);
+      return;
+    }
+    rawData.splice(rawIdx, 1);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData)); } catch (e) {}
+    closeDrawer();
+    currentDrawerIndex = -1;
+    fillSelects();
+    applyFilters();
+    render();
+    updateLandingWarning();
+    toast("已删除需求");
+  }
+  function onDrawerSaveStatus() {
+    var idx = currentDrawerIndex;
+    if (idx < 0 || !filteredData[idx]) return;
+    var r = filteredData[idx];
+    var selectEl = $("drawerStatusSelect");
+    var newStatus = selectEl ? selectEl.value : "";
+    if (!newStatus || newStatus === (r["当前状态"] || "").trim()) return;
+    if (!isVerified()) {
+      pendingAfterVerify = function () { applyStatusChange(idx, newStatus); };
+      openVerifyModal();
+      return;
+    }
+    applyStatusChange(idx, newStatus);
+  }
+  function applyStatusChange(filteredIndex, newStatus) {
+    var r = filteredData[filteredIndex];
+    if (!r) return;
+    var rawIdx = rawData.indexOf(r);
+    if (rawIdx < 0) return;
+    rawData[rawIdx]["当前状态"] = newStatus;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData)); } catch (e) {}
+    applyFilters();
+    render();
+    closeDrawer();
+    toast("状态已更新");
+  }
+  function openVerifyModal() {
+    var el = $("verifyCodeInput");
+    if (el) el.value = "";
+    $("verifyModalMask").classList.add("open");
+    $("verifyModal").classList.add("open");
+  }
+  function closeVerifyModal() {
+    $("verifyModalMask").classList.remove("open");
+    $("verifyModal").classList.remove("open");
+    pendingAfterVerify = null;
+  }
+  function onVerifyConfirm() {
+    var code = ($("verifyCodeInput").value || "").trim();
+    if (!code) { toast("请输入神秘代码", true); return; }
+    if (!isValidSecretCode(code)) {
+      toast("验证失败", true);
+      return;
+    }
+    var pending = pendingAfterVerify;
+    pendingAfterVerify = null;
+    try { sessionStorage.setItem("biBoardVerified", "1"); } catch (e) {}
+    $("verifyModalMask").classList.remove("open");
+    $("verifyModal").classList.remove("open");
+    if (pending) pending();
+  }
+  function closeDrawer() {
+    $("drawer").classList.remove("open");
+    $("drawerMask").classList.remove("open");
+  }
+
+  var searchTimer;
+  $("searchInput").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilters, 300);
+  });
+  $("filterWeek").addEventListener("change", applyFilters);
+  $("filterLine").addEventListener("change", applyFilters);
+  $("filterStatus").addEventListener("change", applyFilters);
+  function openBatchModal() {
+    $("batchModalMask").classList.add("open");
+  }
+  function closeBatchModal() {
+    $("batchModalMask").classList.remove("open");
+    $("batchFileInput").value = "";
+  }
+  $("btnBatchAdd").addEventListener("click", openBatchModal);
+  $("batchModalMask").addEventListener("click", closeBatchModal);
+  $("batchModalClose").addEventListener("click", closeBatchModal);
+  $("batchBtnTemplate").addEventListener("click", function () {
+    var headers = ALL_COLS.map(function (c) {
+      var v = (c || "").replace(/"/g, '""');
+      return '"' + v + '"';
+    }).join(",");
+    var emptyRow = ALL_COLS.map(function () { return '""'; }).join(",");
+    var csv = "\uFEFF" + headers + "\n" + emptyRow + "\n";
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "bi-demand-import-template.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("已下载模板，请按表头填写数据后上传");
+  });
+  $("batchBtnUpload").addEventListener("click", function () { $("batchFileInput").click(); });
+  $("batchFileInput").addEventListener("change", function () {
+    var f = this.files[0];
+    if (!f) return;
+    var self = this;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var res = parseCSV(reader.result);
+      if (res && res.error) {
+        toast(res.error, true);
+        self.value = "";
+        return;
+      }
+      if (!res || !res.rows || res.rows.length === 0) {
+        toast("解析无数据，请检查文件格式与列名。", true);
+        self.value = "";
+        return;
+      }
+      var rowErrors = [];
+      var validRows = [];
+      res.rows.forEach(function (row, i) {
+        var rowNum = i + 2;
+        var hasAny = REQUIRED_COLS.some(function (col) { return (row[col] || "").trim().length > 0; });
+        if (!hasAny) return;
+        REQUIRED_COLS.forEach(function (col) {
+          if (!(row[col] || "").trim()) rowErrors.push("第" + rowNum + "行：缺少必填项「" + col + "」");
+        });
+        if (REQUIRED_COLS.every(function (col) { return (row[col] || "").trim().length > 0; })) validRows.push(row);
+      });
+      if (rowErrors.length > 0) {
+        toast(rowErrors.length > 3 ? "导入失败：共 " + rowErrors.length + " 处必填项缺失，请检查后重新上传。" : "导入失败：" + rowErrors.join("；"), true);
+        self.value = "";
+        return;
+      }
+      rawData = rawData.concat(validRows);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData)); } catch (e) {}
+      fillSelects();
+      applyFilters();
+      $("dataScopeHint").textContent = "已导入 " + rawData.length + " 条，展示最近三周";
+      closeBatchModal();
+      toast("成功导入 " + validRows.length + " 条需求");
+    };
+    reader.readAsText(f, "UTF-8");
+  });
+  function openAddDemandModal() {
+    $("addDemandModalMask").classList.add("open");
+    Object.keys(FORM_FIELD_MAP).forEach(function (id) {
+      var el = $(id);
+      if (el) el.value = "";
+    });
+  }
+  function closeAddDemandModal() {
+    $("addDemandModalMask").classList.remove("open");
+  }
+  function getAddDemandFormRow() {
+    var row = {};
+    Object.keys(FORM_FIELD_MAP).forEach(function (id) {
+      var el = $(id);
+      row[FORM_FIELD_MAP[id]] = el ? (el.value || "").trim() : "";
+    });
+    return row;
+  }
+  $("btnAddDemand").addEventListener("click", openAddDemandModal);
+  $("addDemandModalMask").addEventListener("click", closeAddDemandModal);
+  $("addDemandCancel").addEventListener("click", closeAddDemandModal);
+  $("addDemandSubmit").addEventListener("click", function () {
+    var row = getAddDemandFormRow();
+    var miss = [];
+    REQUIRED_COLS.forEach(function (col) {
+      if (!row[col]) miss.push(col);
+    });
+    if (miss.length > 0) {
+      toast("请填写必填项：" + miss.join("、"), true);
+      return;
+    }
+    rawData.push(row);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData)); } catch (e) {}
+    fillSelects();
+    applyFilters();
+    closeAddDemandModal();
+    toast("已添加 1 条需求");
+  });
+  $("btnExport").addEventListener("click", function () {
+    if (filteredData.length === 0) {
+      toast("当前无数据可导出");
+      return;
+    }
+    var headers = ALL_COLS.join(",");
+    var rows = filteredData.map(function (r) {
+      return ALL_COLS.map(function (c) {
+        var v = (r[c] || "").replace(/"/g, '""');
+        return '"' + v + '"';
+      }).join(",");
+    }).join("\n");
+    var blob = new Blob(["\uFEFF" + headers + "\n" + rows], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "bi-demand-export-" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("已导出 " + filteredData.length + " 条");
+  });
+  document.querySelectorAll(".view-tab").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      viewMode = this.getAttribute("data-view");
+      document.querySelectorAll(".view-tab").forEach(function (b) { b.classList.remove("active"); });
+      this.classList.add("active");
+      render();
+    });
+  });
+  $("chipP01").addEventListener("click", function () {
+    chipP01 = !chipP01;
+    this.classList.toggle("active", chipP01);
+    applyFilters();
+  });
+  $("chipMine").addEventListener("click", function () {
+    if (!myName) myName = prompt("请输入您的姓名（BI 负责人）用于筛选「我的需求」：") || "";
+    chipMine = !!myName;
+    $("chipMine").classList.toggle("active", chipMine);
+    applyFilters();
+  });
+  $("btnClearFilter").addEventListener("click", function () {
+    $("searchInput").value = "";
+    $("filterWeek").value = "";
+    $("filterLine").value = "";
+    $("filterStatus").value = "";
+    chipP01 = false;
+    chipMine = false;
+    $("chipP01").classList.remove("active");
+    $("chipMine").classList.remove("active");
+    fillSelects();
+    applyFilters();
+  });
+  $("btnClearFilterBoard").addEventListener("click", function () { $("btnClearFilter").click(); });
+  $("tableBody").addEventListener("click", function (e) {
+    var row = e.target.closest("tr[data-i]");
+    if (row) openDrawer(parseInt(row.getAttribute("data-i"), 10));
+  });
+  $("boardColumns").addEventListener("click", function (e) {
+    var card = e.target.closest(".board-card");
+    if (!card) return;
+    var i = card.getAttribute("data-i");
+    if (e.target.closest(".card-detail")) return;
+    if (card.classList.contains("expanded")) {
+      openDrawer(parseInt(i, 10));
+      return;
+    }
+    card.classList.add("expanded");
+  });
+  $("btnEnterBoard").addEventListener("click", function () {
+    $("landingView").classList.add("hidden");
+    $("boardPanel").classList.add("visible");
+    setTimeout(updateTrendChart, 80);
+  });
+  $("btnBackLanding").addEventListener("click", function () {
+    updateLandingWarning();
+    $("landingView").classList.remove("hidden");
+    $("boardPanel").classList.remove("visible");
+  });
+  $("drawerMask").addEventListener("click", closeDrawer);
+  $("drawerClose").addEventListener("click", closeDrawer);
+  $("verifyModalClose").addEventListener("click", closeVerifyModal);
+  $("verifyModalConfirm").addEventListener("click", onVerifyConfirm);
+  $("verifyModalMask").addEventListener("click", closeVerifyModal);
+  $("verifyCodeInput").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); onVerifyConfirm(); } });
+  document.querySelectorAll(".table th.sortable").forEach(function (th) {
+    th.addEventListener("click", function () {
+      var key = this.getAttribute("data-sort");
+      if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = 1; }
+      applyFilters();
+    });
+  });
+  try {
+    var prevVer = localStorage.getItem(STORAGE_VERSION_KEY);
+    if (prevVer !== EMBEDDED_DATA_VERSION) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(STORAGE_VERSION_KEY, EMBEDDED_DATA_VERSION);
+    }
+  } catch (e) {}
+  try {
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      var arr = JSON.parse(saved);
+      if (Array.isArray(arr) && arr.length > 0) {
+        rawData = arr;
+        normalizePastWeeksStatus();
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData)); } catch (e) {}
+        fillSelects();
+        applyFilters();
+        updateLandingWarning();
+        $("dataScopeHint").textContent = "已加载 " + rawData.length + " 条（本地）";
+        render();
+        return;
+      }
+    }
+  } catch (e) {}
+  var defaultEl = document.getElementById("defaultCsv");
+  if (defaultEl && defaultEl.textContent) {
+    var res = parseCSV(defaultEl.textContent.trim());
+    if (res && !res.error && res.rows && res.rows.length > 0) {
+      rawData = res.rows;
+      normalizePastWeeksStatus();
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawData)); } catch (e) {}
+      fillSelects();
+      applyFilters();
+      $("dataScopeHint").textContent = "已加载 " + rawData.length + " 条数据";
+    }
+  }
+  updateLandingWarning();
+  render();
+})();
+  </script>
+</body>
+</html>
