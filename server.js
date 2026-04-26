@@ -3,17 +3,24 @@ const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
+const compression = require('compression');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// 使用持久化存储目录（Railway Volume）
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+// 使用持久化存储目录
+// Railway: 使用 /data 目录（需要配置 Volume）
+// 本地/其他: 使用项目下的 data 目录
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH ||
+                 process.env.DATA_DIR ||
+                 path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
+
+console.log('数据文件路径:', DATA_FILE);
 
 // 初始化数据文件
 if (!fs.existsSync(DATA_FILE)) {
@@ -43,8 +50,15 @@ function broadcast(message, excludeWs = null) {
   });
 }
 
+// 启用 gzip 压缩
+app.use(compression());
+
 // 静态文件服务
-app.use(express.static(__dirname));
+app.use(express.static(__dirname, {
+  maxAge: '1h',
+  etag: true,
+  lastModified: true
+}));
 app.use(express.json({ limit: '10mb' }));
 
 // 默认路由指向完整版实时协作界面
@@ -82,6 +96,10 @@ wss.on('connection', (ws) => {
       if (msg.type === 'update') {
         saveData(msg.data);
         broadcast({ type: 'data_update', data: msg.data }, ws);
+      } else if (msg.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+      } else if (msg.type === 'refresh') {
+        ws.send(JSON.stringify({ type: 'data_update', data: loadData() }));
       }
     } catch (e) {
       console.error('消息解析错误:', e);
