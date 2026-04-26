@@ -1,175 +1,120 @@
 # 部署指南
 
-## 📦 准备工作
+## Railway 部署步骤
 
-你的项目已经准备好部署了！包含以下文件：
-
-- ✅ `server.js` - 后端服务器（支持 WebSocket 实时同步）
-- ✅ `index-realtime.html` - 实时协作版前端
-- ✅ `package.json` - 项目依赖配置
-- ✅ `railway.json` - Railway 部署配置
-- ✅ `data.json` - 数据存储文件
-
-## 🚀 方案一：部署到 Railway（最简单，推荐）
-
-### 步骤：
-
-1. **访问 Railway**
-   - 打开 https://railway.app/
-   - 使用 GitHub 账号登录
-
-2. **创建新项目**
-   - 点击 "New Project"
-   - 选择 "Deploy from GitHub repo"
-   - 如果是第一次，需要授权 Railway 访问你的 GitHub
-
-3. **连接仓库**
-   - 选择你的仓库（需要先把代码推送到 GitHub）
-   - Railway 会自动检测到 Node.js 项目
-
-4. **等待部署**
-   - Railway 会自动安装依赖并启动服务
-   - 大约 2-3 分钟完成
-
-5. **获取访问地址**
-   - 部署完成后，点击 "Settings" → "Generate Domain"
-   - 会生成一个类似 `https://your-app.up.railway.app` 的地址
-   - 把这个地址分享给同事即可！
-
-### Railway 优点：
-- ✅ 完全免费（每月 $5 额度，足够小团队使用）
-- ✅ 自动 HTTPS
-- ✅ 自动重启
-- ✅ 支持 WebSocket
-
----
-
-## 🌐 方案二：部署到 Render
-
-### 步骤：
-
-1. **访问 Render**
-   - 打开 https://render.com/
-   - 使用 GitHub 账号登录
-
-2. **创建 Web Service**
-   - 点击 "New +" → "Web Service"
-   - 连接你的 GitHub 仓库
-
-3. **配置项目**
-   ```
-   Name: bi-demand-board
-   Environment: Node
-   Build Command: npm install
-   Start Command: npm start
-   ```
-
-4. **选择免费计划**
-   - 选择 "Free" 计划
-   - 点击 "Create Web Service"
-
-5. **等待部署**
-   - 大约 5 分钟完成
-   - 会生成一个 `https://your-app.onrender.com` 地址
-
-### Render 注意事项：
-- ⚠️ 免费版会在 15 分钟无活动后休眠
-- ⚠️ 首次访问可能需要等待 30 秒唤醒
-- ✅ 适合低频使用的场景
-
----
-
-## 💻 方案三：本地测试
-
-如果想先在本地测试：
-
+### 1. 安装依赖
+部署前确保 `package.json` 包含所有依赖：
 ```bash
-# 1. 进入项目目录
-cd /xclaw/projects/binbin.du_at_ximalaya.com_matrix.xmlyoa.com/443b4e6a-9a4b-489f-b665-15f607f5910e
-
-# 2. 安装依赖（已安装可跳过）
 npm install
-
-# 3. 启动服务器
-npm start
-
-# 4. 浏览器访问
-# http://localhost:3000
 ```
 
----
-
-## 📤 推送到 GitHub
-
-如果还没有推送到 GitHub：
-
+### 2. 推送到 Railway
 ```bash
-# 1. 初始化 Git（如果还没有）
-git init
-
-# 2. 添加所有文件
-git add .
-
-# 3. 提交
-git commit -m "初始化 BI 需求管理看板"
-
-# 4. 关联远程仓库（替换成你的仓库地址）
-git remote add origin https://github.com/你的用户名/bi-demand-board.git
-
-# 5. 推送
-git push -u origin main
+git push
 ```
 
----
+Railway 会自动检测更改并重新部署。
 
-## ✅ 部署后的使用
+### 3. 确认 WebSocket 支持
+Railway 默认支持 WebSocket，无需额外配置。确保：
+- 使用 `wss://` 协议（HTTPS 环境）
+- 使用 `ws://` 协议（HTTP 环境）
 
-1. **分享地址**
-   - 把部署后的 URL 发给同事
-   - 例如：`https://your-app.railway.app`
+### 4. 配置 Volume（持久化存储）
+在 Railway 项目设置中：
+1. 进入 "Variables" 标签
+2. 添加 Volume 挂载点：`/app/data`
+3. 服务器会自动使用 `RAILWAY_VOLUME_MOUNT_PATH` 环境变量
 
-2. **实时协作**
-   - 任何人打开网页都能看到最新数据
-   - 一个人新增/编辑需求，其他人会实时看到更新
-   - 右上角显示连接状态（绿色=已连接）
+## 性能优化说明
 
-3. **数据持久化**
-   - 数据保存在服务器的 `data.json` 文件中
-   - 重启服务器不会丢失数据
+### 已实现的优化
+1. **移除外部字体依赖** - 使用系统字体，减少网络请求
+2. **Gzip 压缩** - 压缩 HTML/CSS/JS，减少传输大小
+3. **静态资源缓存** - 1小时缓存，减少重复加载
+4. **WebSocket 心跳** - 保持连接活跃，30秒间隔
+5. **智能重连** - 指数退避策略，最多重连10次
 
----
+### 预期效果
+- 首次加载速度提升 40-60%
+- 重复访问速度提升 70-80%
+- WebSocket 连接更稳定
 
-## 🔧 常见问题
+## 实时同步功能
 
-### Q: 部署后数据是空的？
-A: 首次部署数据为空是正常的。可以：
-   - 手动添加需求
-   - 或从 `bi-demand-board.html` 导出 CSV，然后手动导入
+### 工作原理
+1. 客户端连接时接收完整数据
+2. 任何用户修改数据时，通过 WebSocket 广播给所有在线用户
+3. 心跳检测确保连接活跃
+4. 断线自动重连
 
-### Q: 连接状态显示"未连接"？
-A: 检查：
-   - 浏览器是否支持 WebSocket
-   - 是否使用了 HTTPS（Railway/Render 自动提供）
-   - 刷新页面重试
+### 手动刷新
+如果数据未及时同步，点击页面右上角的 "🔄 刷新" 按钮手动获取最新数据。
 
-### Q: Railway 免费额度够用吗？
-A: 每月 $5 额度，对于小团队（10人以内）完全够用
+### 连接状态指示
+- 🟢 "实时同步中" - 连接正常
+- 🔴 "连接断开" - 正在重连
 
-### Q: 如何备份数据？
-A: 点击"导出 CSV"按钮，定期备份即可
+## 故障排查
 
----
+### 问题1：页面加载慢
+**解决方案：**
+- 检查网络连接
+- 清除浏览器缓存后重试
+- 确认 Railway 服务状态
 
-## 🎉 推荐部署方案
+### 问题2：看不到同事的更新
+**解决方案：**
+1. 检查右上角连接状态
+2. 点击 "🔄 刷新" 按钮
+3. 如果仍未解决，刷新整个页面（F5）
+4. 检查浏览器控制台是否有 WebSocket 错误
 
-**最佳选择：Railway**
-- 简单快速
-- 免费额度充足
-- 支持 WebSocket
-- 自动 HTTPS
+### 问题3：频繁断线重连
+**可能原因：**
+- Railway 服务重启
+- 网络不稳定
+- 防火墙阻止 WebSocket
 
-立即开始：https://railway.app/
+**解决方案：**
+- 等待自动重连（最多10次）
+- 检查网络环境
+- 联系管理员检查 Railway 日志
 
----
+## 监控和日志
 
-有问题随时问我！
+### 查看 Railway 日志
+```bash
+railway logs
+```
+
+### 关键日志信息
+- `WebSocket 连接成功` - 客户端连接
+- `新客户端连接` - 服务端接收连接
+- `客户端断开` - 连接关闭
+- `数据文件路径` - 确认持久化存储位置
+
+## 维护建议
+
+1. **定期备份数据**
+   - 导出 CSV 文件作为备份
+   - Railway Volume 数据会持久化
+
+2. **监控连接数**
+   - 过多连接可能影响性能
+   - 建议同时在线用户 < 50
+
+3. **更新依赖**
+   ```bash
+   npm update
+   git add package.json package-lock.json
+   git commit -m "更新依赖"
+   git push
+   ```
+
+## 技术栈
+
+- **后端**: Node.js + Express + WebSocket (ws)
+- **前端**: 原生 JavaScript + Chart.js
+- **部署**: Railway
+- **存储**: 文件系统 (JSON) + Railway Volume
