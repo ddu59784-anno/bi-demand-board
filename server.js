@@ -42,9 +42,9 @@ function broadcast(message, excludeWs = null) {
 app.use(express.static(__dirname));
 app.use(express.json({ limit: '10mb' }));
 
-// 默认路由指向实时协作版
+// 默认路由指向完整版
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index-realtime.html'));
+  res.sendFile(path.join(__dirname, 'bi-demand-board.html'));
 });
 
 // API: 获取数据
