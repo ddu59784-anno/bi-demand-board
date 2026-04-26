@@ -8,7 +8,12 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+// 使用持久化存储目录（Railway Volume）
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+const DATA_FILE = path.join(DATA_DIR, 'data.json');
 
 // 初始化数据文件
 if (!fs.existsSync(DATA_FILE)) {
