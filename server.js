@@ -10,14 +10,9 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // 使用持久化存储目录
-// Railway: 使用 /data 目录（需要配置 Volume）
-// 本地/其他: 使用项目下的 data 目录
-const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH ||
-                 process.env.DATA_DIR ||
-                 path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+// Railway Volume: 使用 /data 目录
+// 无 Volume: 使用项目根目录（重新部署会丢失）
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || __dirname;
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
 
 console.log('数据文件路径:', DATA_FILE);
